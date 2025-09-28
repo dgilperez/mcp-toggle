@@ -102,6 +102,26 @@ cat > "$MCP_CONFIG" << 'EOF'
         "--profile",
         "${SMITHERY_PROFILE}"
       ]
+    },
+    "memory": {
+      "command": "node",
+      "args": ["$MCP_HOME/servers/node_modules/@modelcontextprotocol/server-memory/dist/index.js"],
+      "env": {}
+    },
+    "fetch": {
+      "command": "node",
+      "args": ["$MCP_HOME/servers/node_modules/@modelcontextprotocol/server-fetch/dist/index.js"],
+      "env": {}
+    },
+    "git": {
+      "command": "node",
+      "args": ["$MCP_HOME/servers/node_modules/@modelcontextprotocol/server-git/dist/index.js"],
+      "env": {}
+    },
+    "puppeteer": {
+      "command": "node",
+      "args": ["$MCP_HOME/servers/node_modules/@modelcontextprotocol/server-puppeteer/dist/index.js"],
+      "env": {}
     }
   }
 }
