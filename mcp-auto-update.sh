@@ -2,6 +2,9 @@
 # MCP Auto-Update System
 # Automatically checks for MCP updates on Monday terminal startup (similar to Oh My Zsh)
 
+# Only load in interactive shells, not subprocess/script contexts
+[[ $- != *i* ]] && return 2>/dev/null || true
+
 # Configuration
 MCP_HOME="$HOME/.mcp"
 MCP_CACHE_DIR="${ZSH_CACHE_DIR:-$HOME/.cache/mcp}"
@@ -117,8 +120,6 @@ function mcp_check_for_update() {
     fi
 }
 
-# Export functions for potential manual use
-export -f mcp_current_epoch mcp_update_last_updated_file mcp_update mcp_check_for_update
-
-# Run the check
-mcp_check_for_update
+# Don't try to export functions in zsh - it's bash-specific
+# Just run the check
+mcp_check_for_update 2>/dev/null || true
