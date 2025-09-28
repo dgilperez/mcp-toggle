@@ -111,18 +111,42 @@ claude --print "Use github to list my recent repos"
 
 ## Maintenance
 
-### Update All MCP Servers
+### Automatic Updates (Recommended)
 
-Run this periodically (e.g., weekly) to get latest versions:
+MCP servers are automatically updated every Monday when you start a new terminal, similar to Oh My Zsh:
+
+- **Frequency**: Weekly on Monday mornings
+- **Background**: Runs without blocking terminal startup
+- **Logging**: Results logged to `~/.cache/mcp/update.log`
+- **Smart**: Only updates if 7+ days have passed
+
+To disable automatic updates:
+```bash
+# Add to ~/.zshrc
+export DISABLE_MCP_AUTO_UPDATE="true"
+```
+
+### Manual Updates
+
+Update all MCP servers manually:
 
 ```bash
 mcp-update
 ```
 
-Or manually:
+Or update packages only:
 ```bash
 cd ~/.mcp/servers
 npm update
+```
+
+Check update status:
+```bash
+# Check last update
+cat ~/.cache/mcp/.mcp-update
+
+# Check update log
+tail ~/.cache/mcp/update.log
 ```
 
 ### Add a New MCP Server
