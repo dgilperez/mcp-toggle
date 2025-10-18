@@ -159,6 +159,177 @@ disable_server() {
     echo -e "${YELLOW}✓ Disabled $server_name${NC}"
 }
 
+# Search for MCP servers
+search_servers() {
+    local query="$1"
+    local category="$2"
+
+    echo -e "${BLUE}=== MCP Server Discovery ===${NC}\n"
+
+    if [ -z "$query" ]; then
+        show_curated_servers "$category"
+    else
+        search_npm "$query"
+    fi
+}
+
+# Show curated popular MCP servers
+show_curated_servers() {
+    local category="$1"
+
+    echo -e "${GREEN}Popular MCP Servers:${NC}\n"
+
+    # Define curated servers (name|||package|||description)
+    local official=(
+        "memory|||@modelcontextprotocol/server-memory|||Knowledge graph persistent memory"
+        "sequential-thinking|||@modelcontextprotocol/server-sequential-thinking|||Dynamic problem-solving"
+        "time|||@modelcontextprotocol/server-time|||Time and timezone conversion"
+        "everything|||@modelcontextprotocol/server-everything|||Full MCP demo server"
+    )
+
+    local database=(
+        "postgres|||mcp-postgres-server|||PostgreSQL database operations"
+        "sqlite|||@modelcontextprotocol/server-sqlite|||SQLite database access"
+    )
+
+    local productivity=(
+        "google-drive|||@modelcontextprotocol/server-gdrive|||Google Drive integration"
+        "slack|||@modelcontextprotocol/server-slack|||Slack workspace access"
+        "obsidian|||@mauricio.wolff/mcp-obsidian|||Obsidian vault operations"
+        "notion|||@notionhq/notion-mcp-server|||Notion workspace integration"
+    )
+
+    local developer=(
+        "sentry|||@sentry/mcp-server|||Error tracking and monitoring"
+        "puppeteer|||@modelcontextprotocol/server-puppeteer|||Browser automation"
+        "github|||installed|||GitHub operations"
+        "filesystem|||installed|||File operations"
+    )
+
+    local search=(
+        "brave-search|||@modelcontextprotocol/server-brave-search|||Privacy-focused web search"
+        "pubmed|||@cyanheads/pubmed-mcp-server|||Scientific literature search"
+    )
+
+    local design=(
+        "figma|||figma-developer-mcp|||Figma design file access"
+    )
+
+    case "$category" in
+        database|db)
+            echo -e "${YELLOW}Database Servers:${NC}"
+            for server in "${database[@]}"; do
+                print_server_array "$server"
+            done
+            ;;
+        productivity|prod)
+            echo -e "${YELLOW}Productivity Servers:${NC}"
+            for server in "${productivity[@]}"; do
+                print_server_array "$server"
+            done
+            ;;
+        dev|developer)
+            echo -e "${YELLOW}Developer Tools:${NC}"
+            for server in "${developer[@]}"; do
+                print_server_array "$server"
+            done
+            ;;
+        search|data)
+            echo -e "${YELLOW}Search & Data:${NC}"
+            for server in "${search[@]}"; do
+                print_server_array "$server"
+            done
+            ;;
+        official)
+            echo -e "${YELLOW}Official MCP Servers:${NC}"
+            for server in "${official[@]}"; do
+                print_server_array "$server"
+            done
+            ;;
+        *)
+            # Show all categories
+            echo -e "${YELLOW}📚 Official Servers:${NC}"
+            for server in "${official[@]}"; do
+                print_server_array "$server"
+            done
+
+            echo -e "\n${YELLOW}💾 Database:${NC}"
+            for server in "${database[@]}"; do
+                print_server_array "$server"
+            done
+
+            echo -e "\n${YELLOW}🔍 Search & Research:${NC}"
+            for server in "${search[@]}"; do
+                print_server_array "$server"
+            done
+
+            echo -e "\n${YELLOW}📝 Productivity:${NC}"
+            for server in "${productivity[@]}"; do
+                print_server_array "$server"
+            done
+
+            echo -e "\n${YELLOW}🛠️  Developer Tools:${NC}"
+            for server in "${developer[@]}"; do
+                print_server_array "$server"
+            done
+
+            echo -e "\n${YELLOW}🎨 Design:${NC}"
+            for server in "${design[@]}"; do
+                print_server_array "$server"
+            done
+            ;;
+    esac
+
+    echo ""
+    echo -e "${BLUE}To install a server:${NC}"
+    echo "  cd ~/.mcp/servers && npm install <package-name>"
+    echo "  Then add to Claude config with: mcp-toggle add <server-name>"
+    echo ""
+    echo -e "${BLUE}Categories:${NC}"
+    echo "  mcp-toggle discover official       # Official MCP servers"
+    echo "  mcp-toggle discover database       # Database servers"
+    echo "  mcp-toggle discover productivity   # Productivity tools"
+    echo "  mcp-toggle discover dev            # Developer tools"
+    echo "  mcp-toggle discover search         # Search & data servers"
+    echo ""
+}
+
+# Print server info from array format (name|||package|||description)
+print_server_array() {
+    local server_data="$1"
+    local name=$(echo "$server_data" | cut -d'|' -f1)
+    local package=$(echo "$server_data" | cut -d'|' -f4)
+    local description=$(echo "$server_data" | cut -d'|' -f7-)
+
+    # Check if already installed
+    local status=""
+    if [ -d "$HOME/.mcp/servers/node_modules/$(echo $package | sed 's/@//' | cut -d'/' -f1-2)" ] || [ "$package" = "installed" ]; then
+        status="${GREEN}[installed]${NC}"
+    fi
+
+    printf "  %-25s %-40s %b\n" "$name" "$package" "$status"
+    printf "    └─ %s\n" "$description"
+}
+
+# Search npm for MCP packages
+search_npm() {
+    local query="$1"
+
+    echo -e "${YELLOW}Searching npm for: $query${NC}\n"
+
+    # Search npm and format results
+    npm search "mcp $query" 2>/dev/null | head -20 | grep -v "^NAME" | while IFS= read -r line; do
+        if [ -n "$line" ]; then
+            echo "  $line"
+        fi
+    done
+
+    echo ""
+    echo -e "${BLUE}To see more results, use:${NC}"
+    echo "  npm search \"mcp $query\""
+    echo ""
+}
+
 # Show help
 show_help() {
     echo -e "${BLUE}MCP Server Toggle Script${NC}"
@@ -166,17 +337,22 @@ show_help() {
     echo "Enable or disable MCP servers without losing configuration."
     echo ""
     echo -e "${GREEN}Usage:${NC}"
-    echo "  $0 enable <server-name>     Enable a disabled server"
-    echo "  $0 disable <server-name>    Disable an enabled server"
-    echo "  $0 status [server-name]     Show status of server(s)"
-    echo "  $0 list                     List all servers (enabled and disabled)"
-    echo "  $0 help                     Show this help message"
+    echo "  $0 enable <server-name>       Enable a disabled server"
+    echo "  $0 disable <server-name>      Disable an enabled server"
+    echo "  $0 status [server-name]       Show status of server(s)"
+    echo "  $0 list                       List all servers (enabled and disabled)"
+    echo "  $0 discover [category]        Discover popular MCP servers"
+    echo "  $0 search <query>             Search npm for MCP servers"
+    echo "  $0 help                       Show this help message"
     echo ""
     echo -e "${GREEN}Examples:${NC}"
-    echo "  $0 disable figma            Disable Figma MCP server"
-    echo "  $0 enable figma             Re-enable Figma MCP server"
-    echo "  $0 status figma             Check if Figma is enabled or disabled"
-    echo "  $0 list                     List all servers"
+    echo "  $0 disable figma              Disable Figma MCP server"
+    echo "  $0 enable figma               Re-enable Figma MCP server"
+    echo "  $0 status figma               Check if Figma is enabled or disabled"
+    echo "  $0 list                       List all servers"
+    echo "  $0 discover                   Show all popular MCP servers"
+    echo "  $0 discover database          Show database MCP servers"
+    echo "  $0 search postgres            Search npm for postgres MCP servers"
     echo ""
     echo -e "${YELLOW}Notes:${NC}"
     echo "  - Configuration is preserved when disabling"
@@ -206,6 +382,17 @@ main() {
             ;;
         list)
             list_servers
+            ;;
+        discover)
+            search_servers "" "$server_name"
+            ;;
+        search)
+            if [ -z "$server_name" ]; then
+                echo -e "${RED}Error: Search query required${NC}"
+                echo "Usage: $0 search <query>"
+                exit 1
+            fi
+            search_servers "$server_name"
             ;;
         help|--help|-h)
             show_help
