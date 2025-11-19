@@ -5,6 +5,9 @@
 *config.json
 *-config.json
 
+# But allow example configs
+!examples/*config.json
+
 # API Keys and Secrets
 *api-key*
 *secret*
