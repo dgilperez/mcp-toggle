@@ -49,6 +49,13 @@ cat > /tmp/mcp-servers.json << EOF
     "env": {
       "NOTION_API_KEY": "\${NOTION_API_KEY}"
     }
+  },
+  "figma": {
+    "command": "node",
+    "args": ["$MCP_HOME/servers/node_modules/figma-developer-mcp/dist/bin.js", "--stdio"],
+    "env": {
+      "FIGMA_API_KEY": "\${FIGMA_API_KEY}"
+    }
   }
 }
 EOF

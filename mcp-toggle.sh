@@ -159,6 +159,50 @@ disable_server() {
     echo -e "${YELLOW}✓ Disabled $server_name${NC}"
 }
 
+# Restart MCP servers (restart Claude Code)
+restart_mcp() {
+    local server_name="$1"
+
+    echo -e "${BLUE}=== MCP Server Restart ===${NC}\n"
+
+    if [ -n "$server_name" ]; then
+        echo -e "${YELLOW}Note: Individual server restart not supported${NC}"
+        echo -e "To restart $server_name, you need to restart Claude Code.\n"
+    fi
+
+    echo -e "${YELLOW}MCP servers run as subprocesses of Claude Code.${NC}"
+    echo -e "${YELLOW}To restart them (e.g., to pick up new environment variables):${NC}\n"
+
+    echo -e "${GREEN}Option 1: Restart current Claude Code session${NC}"
+    echo "  1. Type: /exit"
+    echo "  2. Start new session: claude"
+    echo ""
+
+    echo -e "${GREEN}Option 2: Kill all Claude Code processes${NC}"
+    echo "  pkill -f 'claude|mcp.*server'"
+    echo "  claude"
+    echo ""
+
+    echo -e "${BLUE}Common reasons to restart:${NC}"
+    echo "  • Updated API keys in .zshrc"
+    echo "  • Changed MCP server configuration"
+    echo "  • Updated environment variables"
+    echo "  • MCP server not responding"
+    echo ""
+
+    # Check if we're inside a Claude Code session
+    if [ -n "$CLAUDE_CODE_SESSION" ] || pgrep -f "claude" > /dev/null 2>&1; then
+        echo -e "${YELLOW}⚠ Claude Code appears to be running${NC}"
+        echo -e "${YELLOW}  Exit your current session with /exit before restarting${NC}"
+        echo ""
+    fi
+
+    # Show running MCP processes
+    echo -e "${BLUE}Currently running MCP-related processes:${NC}"
+    ps aux | grep -E "claude|mcp.*server|node.*\.mcp" | grep -v grep | awk '{print "  " $11, $12, $13, $14, $15}' || echo "  (none found)"
+    echo ""
+}
+
 # Search for MCP servers
 search_servers() {
     local query="$1"
@@ -341,6 +385,7 @@ show_help() {
     echo "  $0 disable <server-name>      Disable an enabled server"
     echo "  $0 status [server-name]       Show status of server(s)"
     echo "  $0 list                       List all servers (enabled and disabled)"
+    echo "  $0 restart [server-name]      Show how to restart MCP servers"
     echo "  $0 discover [category]        Discover popular MCP servers"
     echo "  $0 search <query>             Search npm for MCP servers"
     echo "  $0 help                       Show this help message"
@@ -350,6 +395,8 @@ show_help() {
     echo "  $0 enable figma               Re-enable Figma MCP server"
     echo "  $0 status figma               Check if Figma is enabled or disabled"
     echo "  $0 list                       List all servers"
+    echo "  $0 restart                    Show how to restart all MCP servers"
+    echo "  $0 restart figma              Show how to restart Figma server"
     echo "  $0 discover                   Show all popular MCP servers"
     echo "  $0 discover database          Show database MCP servers"
     echo "  $0 search postgres            Search npm for postgres MCP servers"
@@ -382,6 +429,9 @@ main() {
             ;;
         list)
             list_servers
+            ;;
+        restart)
+            restart_mcp "$server_name"
             ;;
         discover)
             search_servers "" "$server_name"
