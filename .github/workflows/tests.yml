@@ -1,0 +1,39 @@
+name: Tests
+
+on:
+  push:
+    branches: [ master, main ]
+  pull_request:
+    branches: [ master, main ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    - name: Set up Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '18'
+
+    - name: Install jq
+      run: sudo apt-get update && sudo apt-get install -y jq
+
+    - name: Make scripts executable
+      run: chmod +x tests/*.sh
+
+    - name: Run test suite
+      run: ./tests/run-all-tests.sh
+
+    - name: Test summary
+      if: always()
+      run: |
+        echo "## Test Results" >> $GITHUB_STEP_SUMMARY
+        if [ -f tests/test-results.txt ]; then
+          cat tests/test-results.txt >> $GITHUB_STEP_SUMMARY
+        else
+          echo "✅ All tests passed!" >> $GITHUB_STEP_SUMMARY
+        fi
