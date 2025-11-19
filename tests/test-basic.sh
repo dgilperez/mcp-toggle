@@ -79,8 +79,9 @@ test_required_commands() {
 test_no_hardcoded_paths() {
     test_header "No hardcoded personal paths"
 
-    if ! grep -r "dgilperez" "$PROJECT_ROOT" --exclude-dir=.git --exclude-dir=tests >/dev/null 2>&1; then
-        pass "No hardcoded username 'dgilperez'"
+    # Allow GitHub URLs but not other hardcoded paths
+    if ! grep -r "dgilperez" "$PROJECT_ROOT" --exclude-dir=.git --exclude-dir=tests 2>/dev/null | grep -v "github.com" >/dev/null 2>&1; then
+        pass "No hardcoded username (GitHub URLs allowed)"
     else
         fail "Found hardcoded username 'dgilperez'"
     fi
