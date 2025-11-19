@@ -83,6 +83,10 @@ Enable and disable MCP servers without losing their configuration:
 # Enable a server (moves back to mcpServers)
 ./mcp-toggle.sh enable figma
 
+# Bulk operations - enable/disable multiple servers at once
+./mcp-toggle.sh enable figma puppeteer notion
+./mcp-toggle.sh disable github brave-search
+
 # Check server status
 ./mcp-toggle.sh status figma
 ```
@@ -114,7 +118,40 @@ The discover feature includes 50+ curated MCP servers organized by category:
 - **Search**: Brave, Exa, Google Search, etc.
 - **AI & ML**: Ollama, Perplexity, etc.
 
-### 3. Multi-Editor Support
+### 3. Context Window Management
+
+Check token impact of MCP servers to manage your context window effectively:
+
+```bash
+# See detailed info including token impact
+./mcp-toggle.sh info filesystem
+# Shows: Heavy impact - consider disabling when not needed
+
+./mcp-toggle.sh info brave-search
+# Shows: Light impact - safe to keep enabled
+```
+
+Impact levels:
+- **Heavy**: 1000+ tokens (filesystem, figma, puppeteer, obsidian)
+- **Medium**: 100-1000 tokens (github, databases, notion)
+- **Light**: <100 tokens (search, slack, official servers)
+
+### 4. Usage Analytics
+
+Get insights into your server configuration and receive recommendations:
+
+```bash
+# Show statistics and recommendations
+./mcp-toggle.sh stats
+```
+
+Displays:
+- Enabled/disabled server counts
+- Impact breakdown (Heavy/Medium/Light)
+- Estimated context usage
+- Smart recommendations based on your setup
+
+### 5. Multi-Editor Support
 
 Sync your MCP configuration across multiple editors:
 
@@ -135,21 +172,25 @@ Each editor receives a properly formatted configuration with:
 - Editor-specific paths and formats
 - Automatic server discovery
 
-### 4. Health Checks
+### 6. Health Checks
 
-Verify your MCP setup is working correctly:
+Verify your MCP servers are properly configured and healthy:
 
 ```bash
-./health-check.sh
+# Check all enabled servers
+./mcp-toggle.sh health
+
+# Check specific server
+./mcp-toggle.sh health filesystem
 ```
 
 This checks:
-- MCP server packages are installed
-- Configuration files are valid JSON
-- Environment variables are set
-- Editors can access the configuration
+- Command availability (node, python, npx, etc.)
+- Required environment variables are set
+- Server configuration is valid
+- Provides actionable recommendations for issues found
 
-### 5. Automatic Updates
+### 7. Automatic Updates
 
 MCP servers are automatically updated every Monday when you start a new terminal (Oh My Zsh style):
 

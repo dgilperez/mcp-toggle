@@ -12,8 +12,14 @@
 
 set -e
 
+# Parse --config flag for testing
 CLAUDE_CONFIG="$HOME/.claude.json"
-BACKUP_DIR="$HOME/.mcp/backups"
+if [ "${1:-}" = "--config" ]; then
+    CLAUDE_CONFIG="$2"
+    shift 2
+fi
+
+BACKUP_DIR="${MCP_BACKUP_DIR:-$HOME/.mcp/backups}"
 
 # Colors for output
 RED='\033[0;31m'
@@ -62,6 +68,123 @@ list_servers() {
     done || echo "  (none)"
 }
 
+# Get server metadata (impact and description)
+get_server_metadata() {
+    local server_name="$1"
+
+    # Define metadata: server|||impact|||description
+    # Impact: Heavy (1000+ tokens), Medium (100-1000), Light (<100)
+    case "$server_name" in
+        filesystem)
+            echo "Heavy|||Reads/writes files; returns full file contents in context"
+            ;;
+        github)
+            echo "Medium|||Fetches repos, issues, PRs; moderate API responses"
+            ;;
+        brave-search|brave)
+            echo "Light|||Returns search results; compact responses"
+            ;;
+        pubmed)
+            echo "Medium|||Scientific papers; abstract-heavy responses"
+            ;;
+        figma)
+            echo "Heavy|||Design files; large JSON responses with layer data"
+            ;;
+        puppeteer)
+            echo "Heavy|||Full webpage scraping; returns complete HTML/DOM"
+            ;;
+        postgres|sqlite)
+            echo "Medium|||Database queries; result set size varies"
+            ;;
+        notion)
+            echo "Medium|||Notion pages; moderate content per page"
+            ;;
+        slack)
+            echo "Light|||Messages and channels; compact responses"
+            ;;
+        obsidian)
+            echo "Heavy|||Note contents; returns full markdown files"
+            ;;
+        memory|sequential-thinking|time|everything)
+            echo "Light|||Official MCP servers; minimal token usage"
+            ;;
+        *)
+            echo "Unknown|||Impact not assessed; check server documentation"
+            ;;
+    esac
+}
+
+# Show detailed server info
+show_server_info() {
+    local server_name="$1"
+
+    if [ -z "$server_name" ]; then
+        echo -e "${RED}Error: Server name required${NC}"
+        echo "Usage: $0 info <server-name>"
+        exit 1
+    fi
+
+    echo -e "${BLUE}=== Server Information: $server_name ===${NC}\n"
+
+    # Check status
+    local status="NOT FOUND"
+    local status_color="$RED"
+    local config_section=""
+
+    if jq -e ".mcpServers.\"$server_name\"" "$CLAUDE_CONFIG" &>/dev/null; then
+        status="ENABLED"
+        status_color="$GREEN"
+        config_section="mcpServers"
+    elif jq -e "._disabled_mcpServers.\"$server_name\"" "$CLAUDE_CONFIG" &>/dev/null; then
+        status="DISABLED"
+        status_color="$YELLOW"
+        config_section="_disabled_mcpServers"
+    else
+        echo -e "${RED}Server not found in configuration${NC}"
+        return 1
+    fi
+
+    echo -e "${status_color}Status: $status${NC}\n"
+
+    # Get metadata
+    local metadata=$(get_server_metadata "$server_name")
+    local impact=$(echo "$metadata" | cut -d'|' -f1)
+    local description=$(echo "$metadata" | cut -d'|' -f4-)
+
+    # Show impact
+    local impact_color="$GREEN"
+    case "$impact" in
+        Heavy) impact_color="$RED" ;;
+        Medium) impact_color="$YELLOW" ;;
+        Light) impact_color="$GREEN" ;;
+    esac
+
+    echo -e "${BLUE}Context Window Impact:${NC} ${impact_color}$impact${NC}"
+    echo -e "${BLUE}Description:${NC} $description"
+    echo ""
+
+    # Show configuration
+    echo -e "${BLUE}Configuration:${NC}"
+    jq -r ".$config_section.\"$server_name\"" "$CLAUDE_CONFIG" | sed 's/^/  /'
+    echo ""
+
+    # Impact guidance
+    case "$impact" in
+        Heavy)
+            echo -e "${YELLOW}⚠ Heavy Impact:${NC} This server may consume significant context"
+            echo "  Consider disabling when not actively needed"
+            ;;
+        Medium)
+            echo -e "${BLUE}ℹ Medium Impact:${NC} Moderate token usage"
+            echo "  Generally safe to keep enabled"
+            ;;
+        Light)
+            echo -e "${GREEN}✓ Light Impact:${NC} Minimal token usage"
+            echo "  Safe to keep enabled"
+            ;;
+    esac
+}
+
 # Get server status
 get_status() {
     local server_name="$1"
@@ -87,76 +210,106 @@ get_status() {
     return 1
 }
 
-# Enable a server
+# Enable server(s) - supports bulk operations
 enable_server() {
-    local server_name="$1"
+    local server_names=("$@")
 
-    if [ -z "$server_name" ]; then
-        echo -e "${RED}Error: Server name required${NC}"
-        echo "Usage: $0 enable <server-name>"
+    if [ ${#server_names[@]} -eq 0 ]; then
+        echo -e "${RED}Error: At least one server name required${NC}"
+        echo "Usage: $0 enable <server-name> [server-name...]"
         exit 1
     fi
 
-    # Check if already enabled
-    if jq -e ".mcpServers.\"$server_name\"" "$CLAUDE_CONFIG" &>/dev/null; then
-        echo -e "${YELLOW}$server_name is already enabled${NC}"
-        return 0
-    fi
+    # Validate all servers first (atomic operation)
+    local to_enable=()
+    for server_name in "${server_names[@]}"; do
+        # Skip if already enabled
+        if jq -e ".mcpServers.\"$server_name\"" "$CLAUDE_CONFIG" &>/dev/null; then
+            echo -e "${YELLOW}$server_name is already enabled${NC}"
+            continue
+        fi
 
-    # Check if exists in disabled
-    if ! jq -e "._disabled_mcpServers.\"$server_name\"" "$CLAUDE_CONFIG" &>/dev/null; then
-        echo -e "${RED}Error: $server_name not found in disabled servers${NC}"
-        return 1
+        # Check if exists in disabled
+        if ! jq -e "._disabled_mcpServers.\"$server_name\"" "$CLAUDE_CONFIG" &>/dev/null; then
+            echo -e "${RED}Error: $server_name not found in disabled servers${NC}"
+            return 1
+        fi
+
+        to_enable+=("$server_name")
+    done
+
+    # If nothing to enable, exit successfully
+    if [ ${#to_enable[@]} -eq 0 ]; then
+        return 0
     fi
 
     # Backup before changes
     backup_config
 
-    # Move from disabled to enabled
+    # Enable all servers in one operation
     local temp_file=$(mktemp)
-    jq --arg name "$server_name" '
-        .mcpServers[$name] = ._disabled_mcpServers[$name] |
-        del(._disabled_mcpServers[$name])
-    ' "$CLAUDE_CONFIG" > "$temp_file"
+    local jq_script='.'
+    for server_name in "${to_enable[@]}"; do
+        jq_script="$jq_script | .mcpServers[\"$server_name\"] = ._disabled_mcpServers[\"$server_name\"] | del(._disabled_mcpServers[\"$server_name\"])"
+    done
 
+    jq "$jq_script" "$CLAUDE_CONFIG" > "$temp_file"
     mv "$temp_file" "$CLAUDE_CONFIG"
-    echo -e "${GREEN}✓ Enabled $server_name${NC}"
+
+    for server_name in "${to_enable[@]}"; do
+        echo -e "${GREEN}✓ Enabled $server_name${NC}"
+    done
 }
 
-# Disable a server
+# Disable server(s) - supports bulk operations
 disable_server() {
-    local server_name="$1"
+    local server_names=("$@")
 
-    if [ -z "$server_name" ]; then
-        echo -e "${RED}Error: Server name required${NC}"
-        echo "Usage: $0 disable <server-name>"
+    if [ ${#server_names[@]} -eq 0 ]; then
+        echo -e "${RED}Error: At least one server name required${NC}"
+        echo "Usage: $0 disable <server-name> [server-name...]"
         exit 1
     fi
 
-    # Check if already disabled
-    if jq -e "._disabled_mcpServers.\"$server_name\"" "$CLAUDE_CONFIG" &>/dev/null; then
-        echo -e "${YELLOW}$server_name is already disabled${NC}"
-        return 0
-    fi
+    # Validate all servers first (atomic operation)
+    local to_disable=()
+    for server_name in "${server_names[@]}"; do
+        # Skip if already disabled
+        if jq -e "._disabled_mcpServers.\"$server_name\"" "$CLAUDE_CONFIG" &>/dev/null; then
+            echo -e "${YELLOW}$server_name is already disabled${NC}"
+            continue
+        fi
 
-    # Check if exists in enabled
-    if ! jq -e ".mcpServers.\"$server_name\"" "$CLAUDE_CONFIG" &>/dev/null; then
-        echo -e "${RED}Error: $server_name not found in enabled servers${NC}"
-        return 1
+        # Check if exists in enabled
+        if ! jq -e ".mcpServers.\"$server_name\"" "$CLAUDE_CONFIG" &>/dev/null; then
+            echo -e "${RED}Error: $server_name not found in enabled servers${NC}"
+            return 1
+        fi
+
+        to_disable+=("$server_name")
+    done
+
+    # If nothing to disable, exit successfully
+    if [ ${#to_disable[@]} -eq 0 ]; then
+        return 0
     fi
 
     # Backup before changes
     backup_config
 
-    # Move from enabled to disabled
+    # Disable all servers in one operation
     local temp_file=$(mktemp)
-    jq --arg name "$server_name" '
-        ._disabled_mcpServers[$name] = .mcpServers[$name] |
-        del(.mcpServers[$name])
-    ' "$CLAUDE_CONFIG" > "$temp_file"
+    local jq_script='.'
+    for server_name in "${to_disable[@]}"; do
+        jq_script="$jq_script | ._disabled_mcpServers[\"$server_name\"] = .mcpServers[\"$server_name\"] | del(.mcpServers[\"$server_name\"])"
+    done
 
+    jq "$jq_script" "$CLAUDE_CONFIG" > "$temp_file"
     mv "$temp_file" "$CLAUDE_CONFIG"
-    echo -e "${YELLOW}✓ Disabled $server_name${NC}"
+
+    for server_name in "${to_disable[@]}"; do
+        echo -e "${YELLOW}✓ Disabled $server_name${NC}"
+    done
 }
 
 # Restart MCP servers (restart Claude Code)
@@ -374,6 +527,184 @@ search_npm() {
     echo ""
 }
 
+# Health check for MCP servers
+health_check() {
+    local specific_server="$1"
+
+    echo -e "${BLUE}=== MCP Server Health Check ===${NC}\n"
+
+    local total_checked=0
+    local issues_found=0
+    local servers_to_check=()
+
+    # Determine which servers to check
+    if [ -n "$specific_server" ]; then
+        # Check if server exists and is enabled
+        if jq -e ".mcpServers.\"$specific_server\"" "$CLAUDE_CONFIG" &>/dev/null; then
+            servers_to_check=("$specific_server")
+        else
+            echo -e "${RED}Error: $specific_server is not enabled${NC}"
+            return 1
+        fi
+    else
+        # Check all enabled servers
+        while IFS= read -r server; do
+            [ -n "$server" ] && servers_to_check+=("$server")
+        done < <(jq -r '.mcpServers // {} | keys[]' "$CLAUDE_CONFIG" 2>/dev/null)
+    fi
+
+    if [ ${#servers_to_check[@]} -eq 0 ]; then
+        echo -e "${YELLOW}No enabled servers to check${NC}"
+        return 0
+    fi
+
+    # Check each server
+    for server in "${servers_to_check[@]}"; do
+        ((total_checked++))
+        echo -e "${BLUE}Checking:${NC} $server"
+
+        local server_issues=0
+
+        # Get server config
+        local command=$(jq -r ".mcpServers.\"$server\".command" "$CLAUDE_CONFIG" 2>/dev/null)
+        local env_vars=$(jq -r ".mcpServers.\"$server\".env // {} | keys[]" "$CLAUDE_CONFIG" 2>/dev/null)
+
+        # Check command availability
+        if [ -n "$command" ]; then
+            if command -v "$command" &>/dev/null; then
+                echo -e "  ${GREEN}✓${NC} Command '$command' is available"
+            else
+                echo -e "  ${RED}✗${NC} Command '$command' NOT FOUND"
+                ((server_issues++))
+            fi
+        fi
+
+        # Check environment variables
+        if [ -n "$env_vars" ]; then
+            while IFS= read -r env_var; do
+                if [ -n "$env_var" ]; then
+                    # Extract the variable name from ${VAR_NAME} format
+                    local var_name=$(echo "$env_var" | sed 's/\${//;s/}//')
+
+                    if [ -n "${!var_name:-}" ]; then
+                        echo -e "  ${GREEN}✓${NC} Environment variable $var_name is set"
+                    else
+                        echo -e "  ${RED}✗${NC} Environment variable $var_name NOT SET"
+                        ((server_issues++))
+                    fi
+                fi
+            done < <(jq -r ".mcpServers.\"$server\".env // {} | to_entries[] | .value" "$CLAUDE_CONFIG" 2>/dev/null)
+        fi
+
+        if [ $server_issues -eq 0 ]; then
+            echo -e "  ${GREEN}Status: Healthy${NC}"
+        else
+            echo -e "  ${YELLOW}Status: Issues found ($server_issues)${NC}"
+            ((issues_found+=server_issues))
+        fi
+        echo ""
+    done
+
+    # Summary
+    echo -e "${BLUE}=== Summary ===${NC}"
+    echo -e "  Servers checked: $total_checked"
+    if [ $issues_found -eq 0 ]; then
+        echo -e "  ${GREEN}✓ All checks passed!${NC}"
+        echo -e "  ${GREEN}All enabled servers are healthy${NC}"
+        return 0
+    else
+        echo -e "  ${YELLOW}⚠ Issues found: $issues_found${NC}"
+        echo ""
+        echo -e "${YELLOW}Recommendations:${NC}"
+        echo "  - Install missing commands (e.g., 'brew install node')"
+        echo "  - Set missing environment variables in ~/.zshrc or ~/.bashrc"
+        echo "  - Run 'source ~/.zshrc' to reload environment"
+        return 1
+    fi
+}
+
+# Show usage statistics
+show_stats() {
+    echo -e "${BLUE}=== MCP Server Statistics ===${NC}\n"
+
+    # Count servers
+    local enabled_count=$(jq -r '.mcpServers // {} | keys | length' "$CLAUDE_CONFIG" 2>/dev/null || echo "0")
+    local disabled_count=$(jq -r '._disabled_mcpServers // {} | keys | length' "$CLAUDE_CONFIG" 2>/dev/null || echo "0")
+    local total_count=$((enabled_count + disabled_count))
+
+    echo -e "${GREEN}Enabled:${NC}  $enabled_count servers"
+    echo -e "${YELLOW}Disabled:${NC} $disabled_count servers"
+    echo -e "${BLUE}Total:${NC}    $total_count servers"
+    echo ""
+
+    # Analyze enabled servers by impact
+    echo -e "${BLUE}Enabled Servers by Context Impact:${NC}"
+    local heavy_count=0
+    local medium_count=0
+    local light_count=0
+    local heavy_list=""
+    local medium_list=""
+    local light_list=""
+
+    while IFS= read -r server; do
+        if [ -n "$server" ]; then
+            local metadata=$(get_server_metadata "$server")
+            local impact=$(echo "$metadata" | cut -d'|' -f1)
+
+            case "$impact" in
+                Heavy)
+                    ((heavy_count++))
+                    heavy_list="$heavy_list $server"
+                    ;;
+                Medium)
+                    ((medium_count++))
+                    medium_list="$medium_list $server"
+                    ;;
+                Light)
+                    ((light_count++))
+                    light_list="$light_list $server"
+                    ;;
+            esac
+        fi
+    done < <(jq -r '.mcpServers // {} | keys[]' "$CLAUDE_CONFIG" 2>/dev/null)
+
+    echo -e "  ${RED}Heavy:${NC}  $heavy_count server(s)${heavy_list:+ -$heavy_list}"
+    echo -e "  ${YELLOW}Medium:${NC} $medium_count server(s)${medium_list:+ -$medium_list}"
+    echo -e "  ${GREEN}Light:${NC}  $light_count server(s)${light_list:+ -$light_list}"
+    echo ""
+
+    # Estimate total context impact
+    local total_estimate=$((heavy_count * 1500 + medium_count * 500 + light_count * 50))
+    echo -e "${BLUE}Estimated Context Usage:${NC}"
+    echo -e "  ~${total_estimate} tokens (approximate baseline)"
+    echo -e "  ${YELLOW}Note:${NC} Actual usage varies by operation"
+    echo ""
+
+    # Recommendations
+    echo -e "${BLUE}Recommendations:${NC}"
+
+    if [ "$heavy_count" -gt 2 ]; then
+        echo -e "  ${YELLOW}⚠${NC}  You have $heavy_count heavy-impact servers enabled"
+        echo "     Consider disabling unused servers to reduce context usage"
+    fi
+
+    if [ "$enabled_count" -eq 0 ]; then
+        echo -e "  ${YELLOW}⚠${NC}  No servers currently enabled"
+        echo "     Enable servers with: ./mcp-toggle.sh enable <name>"
+    elif [ "$heavy_count" -eq 0 ] && [ "$medium_count" -eq 0 ]; then
+        echo -e "  ${GREEN}✓${NC}  All enabled servers have light context impact"
+        echo "     Your configuration is optimized for minimal token usage"
+    else
+        echo -e "  ${GREEN}✓${NC}  Good balance of server types"
+        echo "     Disable heavy servers when not actively needed"
+    fi
+
+    if [ "$disabled_count" -gt "$enabled_count" ] && [ "$enabled_count" -gt 0 ]; then
+        echo -e "  ${BLUE}ℹ${NC}  More servers are disabled than enabled"
+        echo "     Use 'list' to see what's available"
+    fi
+}
+
 # Show help
 show_help() {
     echo -e "${BLUE}MCP Server Toggle Script${NC}"
@@ -381,9 +712,12 @@ show_help() {
     echo "Enable or disable MCP servers without losing configuration."
     echo ""
     echo -e "${GREEN}Usage:${NC}"
-    echo "  $0 enable <server-name>       Enable a disabled server"
-    echo "  $0 disable <server-name>      Disable an enabled server"
+    echo "  $0 enable <server-name...>    Enable disabled server(s)"
+    echo "  $0 disable <server-name...>   Disable enabled server(s)"
     echo "  $0 status [server-name]       Show status of server(s)"
+    echo "  $0 info <server-name>         Show server details and token impact"
+    echo "  $0 stats                      Show usage statistics and recommendations"
+    echo "  $0 health [server-name]       Check server health and dependencies"
     echo "  $0 list                       List all servers (enabled and disabled)"
     echo "  $0 restart [server-name]      Show how to restart MCP servers"
     echo "  $0 discover [category]        Discover popular MCP servers"
@@ -392,11 +726,15 @@ show_help() {
     echo ""
     echo -e "${GREEN}Examples:${NC}"
     echo "  $0 disable figma              Disable Figma MCP server"
-    echo "  $0 enable figma               Re-enable Figma MCP server"
+    echo "  $0 enable figma puppeteer     Enable multiple servers at once"
+    echo "  $0 disable github brave       Disable multiple servers at once"
     echo "  $0 status figma               Check if Figma is enabled or disabled"
+    echo "  $0 info filesystem            Show filesystem server token impact"
+    echo "  $0 stats                      Show statistics and recommendations"
+    echo "  $0 health                     Check all enabled servers"
+    echo "  $0 health filesystem          Check specific server health"
     echo "  $0 list                       List all servers"
     echo "  $0 restart                    Show how to restart all MCP servers"
-    echo "  $0 restart figma              Show how to restart Figma server"
     echo "  $0 discover                   Show all popular MCP servers"
     echo "  $0 discover database          Show database MCP servers"
     echo "  $0 search postgres            Search npm for postgres MCP servers"
@@ -415,34 +753,43 @@ show_help() {
 # Main command handler
 main() {
     local command="$1"
-    local server_name="$2"
+    shift
 
     case "$command" in
         enable)
-            enable_server "$server_name"
+            enable_server "$@"
             ;;
         disable)
-            disable_server "$server_name"
+            disable_server "$@"
             ;;
         status)
-            get_status "$server_name"
+            get_status "$1"
+            ;;
+        info)
+            show_server_info "$1"
+            ;;
+        stats)
+            show_stats
+            ;;
+        health)
+            health_check "$1"
             ;;
         list)
             list_servers
             ;;
         restart)
-            restart_mcp "$server_name"
+            restart_mcp "$1"
             ;;
         discover)
-            search_servers "" "$server_name"
+            search_servers "" "$1"
             ;;
         search)
-            if [ -z "$server_name" ]; then
+            if [ -z "$1" ]; then
                 echo -e "${RED}Error: Search query required${NC}"
                 echo "Usage: $0 search <query>"
                 exit 1
             fi
-            search_servers "$server_name"
+            search_servers "$1"
             ;;
         help|--help|-h)
             show_help
