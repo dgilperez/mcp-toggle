@@ -1,0 +1,52 @@
+{
+  "mcpServers": {
+    "custom-weather-server": {
+      "command": "node",
+      "args": [
+        "$HOME/.mcp/servers/node_modules/@your-org/weather-mcp/dist/index.js"
+      ],
+      "env": {
+        "WEATHER_API_KEY": "${WEATHER_API_KEY}",
+        "DEFAULT_LOCATION": "${DEFAULT_LOCATION:-New York}"
+      }
+    },
+    "custom-database-server": {
+      "command": "python3",
+      "args": [
+        "$HOME/.mcp/servers/python/my-db-server.py",
+        "--mode", "production"
+      ],
+      "env": {
+        "DB_HOST": "${DB_HOST:-localhost}",
+        "DB_PORT": "${DB_PORT:-5432}",
+        "DB_NAME": "${DB_NAME}",
+        "DB_USER": "${DB_USER}",
+        "DB_PASSWORD": "${DB_PASSWORD}"
+      }
+    },
+    "custom-api-wrapper": {
+      "command": "node",
+      "args": [
+        "$HOME/.mcp/servers/node_modules/@custom/api-wrapper/index.js",
+        "--config", "$HOME/.config/api-wrapper.json"
+      ],
+      "env": {
+        "API_KEY": "${CUSTOM_API_KEY}",
+        "API_ENDPOINT": "${CUSTOM_API_ENDPOINT:-https://api.example.com}",
+        "RATE_LIMIT": "${RATE_LIMIT:-100}"
+      }
+    }
+  },
+  "_disabled_mcpServers": {
+    "experimental-server": {
+      "command": "node",
+      "args": [
+        "$HOME/.mcp/servers/node_modules/@experimental/mcp-server/index.js"
+      ],
+      "env": {
+        "EXPERIMENTAL_FEATURE": "true"
+      },
+      "_note": "This server is disabled while testing. Use mcp-toggle.sh to enable it."
+    }
+  }
+}

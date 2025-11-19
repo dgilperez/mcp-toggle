@@ -9,7 +9,9 @@
 MCP_HOME="$HOME/.mcp"
 MCP_CACHE_DIR="${ZSH_CACHE_DIR:-$HOME/.cache/mcp}"
 MCP_UPDATE_FILE="$MCP_CACHE_DIR/.mcp-update"
-MCP_GLOBAL_SETUP="$HOME/src/mcp-global-setup"
+# Auto-detect script directory (works regardless of installation location)
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-${(%):-%x}}")" && pwd)"
+MCP_TOGGLE_DIR="${MCP_TOGGLE_DIR:-$SCRIPT_DIR}"
 
 # Create cache directory
 mkdir -p "$MCP_CACHE_DIR"
@@ -59,8 +61,8 @@ function mcp_update() {
 
     # Run the update command in background to not block terminal startup
     {
-        if [[ -x "$MCP_GLOBAL_SETUP/update.sh" ]]; then
-            cd "$MCP_GLOBAL_SETUP" && ./update.sh >/dev/null 2>&1
+        if [[ -x "$MCP_TOGGLE_DIR/update.sh" ]]; then
+            cd "$MCP_TOGGLE_DIR" && ./update.sh >/dev/null 2>&1
             local exit_code=$?
 
             if [[ $exit_code -eq 0 ]]; then
@@ -71,7 +73,7 @@ function mcp_update() {
                 mcp_update_last_updated_file "$exit_code" "Update script failed"
             fi
         else
-            echo "⚠️  MCP update script not found at $MCP_GLOBAL_SETUP/update.sh" >> "$MCP_CACHE_DIR/update.log"
+            echo "⚠️  MCP update script not found at $MCP_TOGGLE_DIR/update.sh" >> "$MCP_CACHE_DIR/update.log"
             mcp_update_last_updated_file "1" "Update script not found"
         fi
     } &
@@ -92,7 +94,7 @@ function mcp_check_for_update() {
     [[ ! -t 1 ]] && return
 
     # Skip if update script doesn't exist
-    [[ ! -x "$MCP_GLOBAL_SETUP/update.sh" ]] && return
+    [[ ! -x "$MCP_TOGGLE_DIR/update.sh" ]] && return
 
     local LAST_EPOCH=0
 

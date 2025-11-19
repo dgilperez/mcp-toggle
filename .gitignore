@@ -15,6 +15,10 @@
 generated-*
 local-*
 
+# Claude Code Local Settings (may contain API keys)
+.claude/
+settings.local.json
+
 # Backup Files
 *.backup
 *.bak
