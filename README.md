@@ -1,5 +1,8 @@
 # MCP Toggle
 
+[![Tests](https://github.com/dgilperez/mcp-toggle/workflows/Tests/badge.svg)](https://github.com/dgilperez/mcp-toggle/actions)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
 **Manage, discover, and toggle MCP servers for Claude and other AI tools**
 
 ## Why MCP Toggle?
@@ -26,7 +29,7 @@ MCP Toggle is a comprehensive MCP (Model Context Protocol) server management sys
 
 ```bash
 # Clone the repository
-git clone https://github.com/YOUR-USERNAME/mcp-toggle.git
+git clone https://github.com/dgilperez/mcp-toggle.git
 cd mcp-toggle
 
 # Run installation
@@ -435,7 +438,7 @@ To add new MCP servers to the curated discovery list:
 
 - MCP Documentation: https://modelcontextprotocol.io/
 - Claude Code Docs: https://docs.anthropic.com/claude/docs
-- Issues: [GitHub Issues](https://github.com/YOUR-USERNAME/mcp-toggle/issues)
+- Issues: [GitHub Issues](https://github.com/dgilperez/mcp-toggle/issues)
 
 ## License
 
