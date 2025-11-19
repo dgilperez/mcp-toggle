@@ -623,22 +623,53 @@ health_check() {
     fi
 }
 
+# Draw an ASCII bar chart
+draw_bar() {
+    local count=$1
+    local max=$2
+    local char=$3
+    local width=40
+
+    if [ "$max" -eq 0 ]; then
+        echo ""
+        return
+    fi
+
+    local bar_length=$(( (count * width) / max ))
+    [ "$bar_length" -eq 0 ] && [ "$count" -gt 0 ] && bar_length=1
+
+    local bar=""
+    for ((i=0; i<bar_length; i++)); do
+        bar="${bar}${char}"
+    done
+
+    echo "${bar} ${count}"
+}
+
 # Show usage statistics
 show_stats() {
-    echo -e "${BLUE}=== MCP Server Statistics ===${NC}\n"
+    echo "┌─────────────────────────────────────────────────────────┐"
+    echo "│  MCP SERVER STATS                                       │"
+    echo "└─────────────────────────────────────────────────────────┘"
+    echo ""
 
     # Count servers
     local enabled_count=$(jq -r '.mcpServers // {} | keys | length' "$CLAUDE_CONFIG" 2>/dev/null || echo "0")
     local disabled_count=$(jq -r '._disabled_mcpServers // {} | keys | length' "$CLAUDE_CONFIG" 2>/dev/null || echo "0")
     local total_count=$((enabled_count + disabled_count))
 
-    echo -e "${GREEN}Enabled:${NC}  $enabled_count servers"
-    echo -e "${YELLOW}Disabled:${NC} $disabled_count servers"
-    echo -e "${BLUE}Total:${NC}    $total_count servers"
+    local max_count=$enabled_count
+    [ "$disabled_count" -gt "$max_count" ] && max_count=$disabled_count
+
+    # Server count visualization
+    echo "SERVER STATUS"
+    echo "  Enabled   $(draw_bar "$enabled_count" "$max_count" "█")"
+    echo "  Disabled  $(draw_bar "$disabled_count" "$max_count" "▒")"
+    echo "  ─────────────────────────────────────────────"
+    echo "  Total: $total_count servers"
     echo ""
 
     # Analyze enabled servers by impact
-    echo -e "${BLUE}Enabled Servers by Context Impact:${NC}"
     local heavy_count=0
     local medium_count=0
     local light_count=0
@@ -668,91 +699,124 @@ show_stats() {
         fi
     done < <(jq -r '.mcpServers // {} | keys[]' "$CLAUDE_CONFIG" 2>/dev/null)
 
-    echo -e "  ${RED}Heavy:${NC}  $heavy_count server(s)${heavy_list:+ -$heavy_list}"
-    echo -e "  ${YELLOW}Medium:${NC} $medium_count server(s)${medium_list:+ -$medium_list}"
-    echo -e "  ${GREEN}Light:${NC}  $light_count server(s)${light_list:+ -$light_list}"
+    # Find max for bar chart
+    local impact_max=$heavy_count
+    [ "$medium_count" -gt "$impact_max" ] && impact_max=$medium_count
+    [ "$light_count" -gt "$impact_max" ] && impact_max=$light_count
+
+    # Impact visualization
+    echo "CONTEXT IMPACT (enabled servers)"
+    echo "  Heavy     $(draw_bar "$heavy_count" "$impact_max" "█")${heavy_list:+  ($heavy_list )}"
+    echo "  Medium    $(draw_bar "$medium_count" "$impact_max" "▓")${medium_list:+  ($medium_list )}"
+    echo "  Light     $(draw_bar "$light_count" "$impact_max" "░")${light_list:+  ($light_list )}"
     echo ""
 
     # Estimate total context impact
     local total_estimate=$((heavy_count * 1500 + medium_count * 500 + light_count * 50))
-    echo -e "${BLUE}Estimated Context Usage:${NC}"
-    echo -e "  ~${total_estimate} tokens (approximate baseline)"
-    echo -e "  ${YELLOW}Note:${NC} Actual usage varies by operation"
+    local max_tokens=200000
+    local usage_percent=$(( (total_estimate * 100) / max_tokens ))
+
+    echo "CONTEXT USAGE"
+    echo "  ~${total_estimate} tokens baseline"
+
+    # Visual token usage bar
+    local bar_width=50
+    local filled=$(( (usage_percent * bar_width) / 100 ))
+    [ "$filled" -eq 0 ] && [ "$usage_percent" -gt 0 ] && filled=1
+
+    local bar=""
+    for ((i=0; i<filled; i++)); do
+        bar="${bar}▓"
+    done
+    for ((i=filled; i<bar_width; i++)); do
+        bar="${bar}░"
+    done
+
+    echo "  [${bar}] ${usage_percent}%"
+    echo "  (actual usage varies by operation)"
     echo ""
 
     # Recommendations
-    echo -e "${BLUE}Recommendations:${NC}"
-
-    if [ "$heavy_count" -gt 2 ]; then
-        echo -e "  ${YELLOW}⚠${NC}  You have $heavy_count heavy-impact servers enabled"
-        echo "     Consider disabling unused servers to reduce context usage"
-    fi
+    echo "ANALYSIS"
 
     if [ "$enabled_count" -eq 0 ]; then
-        echo -e "  ${YELLOW}⚠${NC}  No servers currently enabled"
-        echo "     Enable servers with: ./mcp-toggle.sh enable <name>"
+        echo "  * No servers enabled"
+        echo "    → Run 'mcp-toggle discover' to find servers"
+    elif [ "$heavy_count" -gt 2 ]; then
+        echo "  * High context usage: $heavy_count heavy servers enabled"
+        echo "    → Disable unused servers: mcp-toggle disable <name>"
     elif [ "$heavy_count" -eq 0 ] && [ "$medium_count" -eq 0 ]; then
-        echo -e "  ${GREEN}✓${NC}  All enabled servers have light context impact"
-        echo "     Your configuration is optimized for minimal token usage"
+        echo "  * Optimized: All enabled servers are lightweight"
     else
-        echo -e "  ${GREEN}✓${NC}  Good balance of server types"
-        echo "     Disable heavy servers when not actively needed"
+        echo "  * Balanced configuration"
+        echo "    → Disable heavy servers when not needed"
     fi
 
     if [ "$disabled_count" -gt "$enabled_count" ] && [ "$enabled_count" -gt 0 ]; then
-        echo -e "  ${BLUE}ℹ${NC}  More servers are disabled than enabled"
-        echo "     Use 'list' to see what's available"
+        echo "  * More disabled ($disabled_count) than enabled ($enabled_count)"
+        echo "    → Run 'mcp-toggle list' to see available servers"
     fi
+
+    echo ""
 }
 
 # Show help
 show_help() {
-    echo -e "${BLUE}MCP Server Toggle Script${NC}"
-    echo ""
-    echo "Enable or disable MCP servers without losing configuration."
-    echo ""
-    echo -e "${GREEN}Usage:${NC}"
-    echo "  $0 enable <server-name...>    Enable disabled server(s)"
-    echo "  $0 disable <server-name...>   Disable enabled server(s)"
-    echo "  $0 status [server-name]       Show status of server(s)"
-    echo "  $0 info <server-name>         Show server details and token impact"
-    echo "  $0 stats                      Show usage statistics and recommendations"
-    echo "  $0 health [server-name]       Check server health and dependencies"
-    echo "  $0 list                       List all servers (enabled and disabled)"
-    echo "  $0 restart [server-name]      Show how to restart MCP servers"
-    echo "  $0 discover [category]        Discover popular MCP servers"
-    echo "  $0 search <query>             Search npm for MCP servers"
-    echo "  $0 help                       Show this help message"
-    echo ""
-    echo -e "${GREEN}Examples:${NC}"
-    echo "  $0 disable figma              Disable Figma MCP server"
-    echo "  $0 enable figma puppeteer     Enable multiple servers at once"
-    echo "  $0 disable github brave       Disable multiple servers at once"
-    echo "  $0 status figma               Check if Figma is enabled or disabled"
-    echo "  $0 info filesystem            Show filesystem server token impact"
-    echo "  $0 stats                      Show statistics and recommendations"
-    echo "  $0 health                     Check all enabled servers"
-    echo "  $0 health filesystem          Check specific server health"
-    echo "  $0 list                       List all servers"
-    echo "  $0 restart                    Show how to restart all MCP servers"
-    echo "  $0 discover                   Show all popular MCP servers"
-    echo "  $0 discover database          Show database MCP servers"
-    echo "  $0 search postgres            Search npm for postgres MCP servers"
-    echo ""
-    echo -e "${YELLOW}Notes:${NC}"
-    echo "  - Configuration is preserved when disabling"
-    echo "  - Backups are created automatically in ~/.mcp/backups/"
-    echo "  - Disabled servers are stored in _disabled_mcpServers"
-    echo ""
-    echo -e "${BLUE}File Locations:${NC}"
-    echo "  Config:  $CLAUDE_CONFIG"
-    echo "  Backups: $BACKUP_DIR"
-    echo ""
+    cat << EOF
+${BLUE}╔════════════════════════════════════════════════════════════╗
+║           MCP Server Toggle - Quick Reference              ║
+╚════════════════════════════════════════════════════════════╝${NC}
+
+${GREEN}📋 Common Commands${NC}
+  mcp-toggle                      List all servers (default)
+  mcp-toggle ${YELLOW}stats${NC}                  Show visual usage statistics
+  mcp-toggle ${YELLOW}list${NC}                   List enabled/disabled servers
+  mcp-toggle ${YELLOW}enable${NC} <name...>       Enable server(s)
+  mcp-toggle ${YELLOW}disable${NC} <name...>      Disable server(s)
+
+${GREEN}🔍 Information${NC}
+  mcp-toggle ${YELLOW}status${NC} <name>          Check if server is enabled
+  mcp-toggle ${YELLOW}info${NC} <name>            Show server details & token impact
+  mcp-toggle ${YELLOW}health${NC} [name]          Check server dependencies
+
+${GREEN}🌐 Discovery${NC}
+  mcp-toggle ${YELLOW}discover${NC} [category]    Browse popular MCP servers
+  mcp-toggle ${YELLOW}search${NC} <query>         Search npm for MCP servers
+
+${GREEN}⚡ Quick Examples${NC}
+  mcp-toggle disable figma puppeteer   ${BLUE}# Disable multiple servers${NC}
+  mcp-toggle enable github brave       ${BLUE}# Enable multiple servers${NC}
+  mcp-toggle stats                     ${BLUE}# Visual usage analysis${NC}
+  mcp-toggle discover database         ${BLUE}# Browse database servers${NC}
+
+${YELLOW}💡 Pro Tips${NC}
+  • Run without args to see your current setup
+  • Use 'stats' to find heavy context consumers
+  • Disable unused servers to save tokens
+  • Configuration is preserved when disabling
+
+${BLUE}📁 Locations${NC}
+  Config:  ${CLAUDE_CONFIG}
+  Backups: ${BACKUP_DIR}
+
+${BLUE}For detailed help on a command, try:${NC}
+  mcp-toggle <command> --help
+EOF
 }
 
 # Main command handler
 main() {
-    local command="$1"
+    local command="${1:-}"
+
+    # Default to list if no args provided
+    if [ -z "$command" ]; then
+        list_servers
+        echo ""
+        echo -e "${BLUE}💡 Tip:${NC} Run 'mcp-toggle help' to see all commands"
+        echo -e "${BLUE}💡 Tip:${NC} Run 'mcp-toggle stats' for usage analysis"
+        return 0
+    fi
+
     shift
 
     case "$command" in
@@ -786,7 +850,7 @@ main() {
         search)
             if [ -z "$1" ]; then
                 echo -e "${RED}Error: Search query required${NC}"
-                echo "Usage: $0 search <query>"
+                echo "Usage: mcp-toggle search <query>"
                 exit 1
             fi
             search_servers "$1"
@@ -795,8 +859,15 @@ main() {
             show_help
             ;;
         *)
-            echo -e "${RED}Error: Unknown command '$command'${NC}\n"
-            show_help
+            echo -e "${RED}Unknown command: ${YELLOW}$command${NC}"
+            echo ""
+            echo -e "${BLUE}Did you mean one of these?${NC}"
+            echo "  • list       Show all enabled/disabled servers"
+            echo "  • stats      Show usage statistics"
+            echo "  • enable     Enable a disabled server"
+            echo "  • disable    Disable an enabled server"
+            echo "  • help       Show full help"
+            echo ""
             exit 1
             ;;
     esac

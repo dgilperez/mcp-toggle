@@ -74,7 +74,8 @@ source ~/.zshrc  # or source ~/.bashrc
 Enable and disable MCP servers without losing their configuration:
 
 ```bash
-# List all servers and their status
+# List all servers and their status (or just run without args)
+./mcp-toggle.sh
 ./mcp-toggle.sh list
 
 # Disable a server (moves to _disabled_mcpServers)
@@ -138,18 +139,20 @@ Impact levels:
 
 ### 4. Usage Analytics
 
-Get insights into your server configuration and receive recommendations:
+Get insights into your server configuration with retro ASCII visualizations:
 
 ```bash
 # Show statistics and recommendations
 ./mcp-toggle.sh stats
 ```
 
-Displays:
-- Enabled/disabled server counts
-- Impact breakdown (Heavy/Medium/Light)
-- Estimated context usage
-- Smart recommendations based on your setup
+Displays a clean retro-style dashboard with:
+- **Server status bars** - Visual comparison of enabled vs disabled (using █ and ▒)
+- **Impact breakdown** - Heavy/Medium/Light servers with different character weights (█/▓/░)
+- **Context usage meter** - Progress bar showing baseline token consumption
+- **Smart recommendations** - Actionable advice based on your configuration
+
+The stats use monotone ASCII art (no colors) optimized for dark mode terminals, with visual hierarchy created through different character weights rather than color.
 
 ### 5. Multi-Editor Support
 
@@ -487,5 +490,5 @@ MIT License - see [LICENSE](LICENSE) file for details
 
 ---
 
-**Last updated**: 2025-11-19
+**Last updated**: 2025-01-19
 **Version**: 1.0.0

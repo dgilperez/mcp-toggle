@@ -5,6 +5,17 @@ All notable changes to MCP Toggle will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+- **Retro Stats Display**: Redesigned `stats` command with clean retro ASCII aesthetic
+  - Lightweight box drawing (┌─┐│└─┘) instead of heavy banners
+  - Monotone design optimized for dark mode terminals
+  - Visual hierarchy using character weights: █ (solid), ▓ (dark), ▒ (medium), ░ (light)
+  - No colors - purely monochrome design
+  - Simpler layout with better readability
+- **Improved Default Behavior**: Running `mcp-toggle` without args now shows server list with helpful tips instead of blank output
+
 ## [1.0.0] - 2025-11-19
 
 ### Added
