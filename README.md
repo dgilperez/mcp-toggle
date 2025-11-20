@@ -37,19 +37,18 @@ chmod +x install.sh
 ./install.sh
 ```
 
-This installs all MCP servers to `~/.mcp/servers/` and creates a global config at `~/.mcp/global-config.json`.
+This installs essential MCP servers to `~/.mcp/servers/` and creates a global config at `~/.mcp/global-config.json`. Use `discover` to add more servers.
 
-### 2. Set API Keys
+### 2. Set API Keys (Optional)
 
-Add to your `~/.zshrc` or `~/.bashrc`:
+Set API keys for servers you plan to use. Add to your `~/.zshrc` or `~/.bashrc`:
 
 ```bash
-export BRAVE_API_KEY='your-brave-api-key'        # Get from: https://api.search.brave.com/app/keys
-export PUBMED_API_KEY='your-pubmed-api-key'      # Get from: NCBI account
-export PUBMED_EMAIL='your-email@example.com'     # Required for PubMed
-export GH_TOKEN='ghp_your-github-token'          # GitHub personal access token
-export NOTION_API_KEY='your-notion-key'          # If using Notion
-export FIGMA_API_KEY='your-figma-key'            # If using Figma
+# Only add keys for servers you'll use
+export BRAVE_API_KEY='your-key'      # For brave-search
+export GH_TOKEN='your-token'          # For github
+export NOTION_API_KEY='your-key'      # For notion
+# ... add others as needed
 ```
 
 Then reload:
@@ -139,20 +138,18 @@ Impact levels:
 
 ### 4. Usage Analytics
 
-Get insights into your server configuration with retro ASCII visualizations:
+Get insights into your server configuration and receive recommendations:
 
 ```bash
 # Show statistics and recommendations
 ./mcp-toggle.sh stats
 ```
 
-Displays a clean retro-style dashboard with:
-- **Server status bars** - Visual comparison of enabled vs disabled (using █ and ▒)
-- **Impact breakdown** - Heavy/Medium/Light servers with different character weights (█/▓/░)
-- **Context usage meter** - Progress bar showing baseline token consumption
-- **Smart recommendations** - Actionable advice based on your configuration
-
-The stats use monotone ASCII art (no colors) optimized for dark mode terminals, with visual hierarchy created through different character weights rather than color.
+Displays:
+- Enabled/disabled server counts
+- Impact breakdown by category (Heavy/Medium/Light)
+- Estimated context usage baseline
+- Smart recommendations based on your setup
 
 ### 5. Multi-Editor Support
 
@@ -264,18 +261,17 @@ result = subprocess.run([
 
 ### Testing MCP Tools
 
-Test that everything works:
+Test that the installed servers work:
 
 ```bash
-# Test Brave search
-claude --print "Use brave-search to find news about AI"
+# Test filesystem access
+claude --print "List files in my home directory using filesystem"
 
-# Test PubMed
-claude --print "Use pubmed to search for papers on machine learning"
-
-# Test GitHub
-claude --print "Use github to list my recent repos"
+# Test web fetching
+claude --print "Fetch the content from example.com using fetch"
 ```
+
+After installing more servers via `discover`, test them similarly.
 
 ## Maintenance
 
@@ -345,15 +341,16 @@ npm list --depth=0
 
 ## Available MCP Servers
 
-Currently installed:
-- **brave-search**: Web search via Brave
-- **pubmed**: Scientific literature search
-- **github**: GitHub repository operations
+After installation, you'll have:
 - **filesystem**: Local file operations
-- **notion**: Notion workspace access
-- **figma**: Figma design file access
+- **fetch**: Web content fetching
 
-See `./mcp-toggle.sh discover` for 50+ more available servers.
+Discover and install more:
+```bash
+./mcp-toggle.sh discover      # Browse 50+ curated servers
+cd ~/.mcp/servers && npm install @modelcontextprotocol/server-github
+# Then add to config and sync
+```
 
 ## Performance Comparison
 
