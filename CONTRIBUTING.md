@@ -92,7 +92,7 @@ cd mcp-toggle
 3. Test the current setup:
 ```bash
 ./install.sh
-./mcp-toggle.sh list
+./mcp-toggle list
 ```
 
 ### Making Changes
@@ -111,8 +111,8 @@ cd tests
 ./run-all-tests.sh
 
 # Test manually
-./mcp-toggle.sh <your-feature>
-./health-check.sh
+./mcp-toggle <your-feature>
+./bin/health-check.sh
 ```
 
 4. Commit your changes:
@@ -203,27 +203,27 @@ Before submitting a PR, test these scenarios:
 
 2. **Toggle operations**:
    ```bash
-   ./mcp-toggle.sh list
-   ./mcp-toggle.sh disable <server>
-   ./mcp-toggle.sh enable <server>
-   ./mcp-toggle.sh status <server>
+   ./mcp-toggle list
+   ./mcp-toggle disable <server>
+   ./mcp-toggle enable <server>
+   ./mcp-toggle status <server>
    ```
 
 3. **Discovery**:
    ```bash
-   ./mcp-toggle.sh discover
-   ./mcp-toggle.sh discover database
+   ./mcp-toggle discover
+   ./mcp-toggle discover database
    ```
 
 4. **Sync**:
    ```bash
-   ./sync-all.sh
+   ./bin/sync-all.sh
    # Verify configs were created correctly
    ```
 
 5. **Health check**:
    ```bash
-   ./health-check.sh
+   ./bin/health-check.sh
    ```
 
 #### Automated Testing
@@ -283,23 +283,30 @@ Add tests for new features in the `tests/` directory.
 
 ```
 mcp-toggle/
+├── bin/                     # Helper scripts
+│   ├── sync-all.sh          # Multi-editor sync
+│   └── health-check.sh      # System-wide health check
+├── data/                    # MCP server cache and metadata
+│   ├── mcp-cache.json       # Auto-generated weekly
+│   └── manual-metadata.json # Manual contributions
 ├── docs/                    # Documentation
-│   ├── AUTO_UPDATE_GUIDE.md
-│   ├── SECURITY_AUDIT.md
+│   ├── CONTRIBUTING_CACHE.md
 │   ├── TROUBLESHOOTING.md
-│   └── PLANNING_HISTORY.md
-├── tests/                   # Test suite
-│   ├── test-toggle.sh
-│   ├── test-install.sh
-│   ├── test-sync.sh
-│   └── run-all-tests.sh
+│   └── archive/             # Historical docs
 ├── examples/                # Example configurations
-├── install.sh               # Installation script
-├── mcp-toggle.sh            # Main toggle script (CORE)
-├── sync-all.sh              # Multi-editor sync
-├── health-check.sh          # Health verification
-├── mcp-auto-update.sh       # Auto-update system
-├── update-claude-config.sh  # Claude config updater
+├── scripts/                 # Internal/CI automation
+│   ├── generate-cache.sh    # Cache generation
+│   └── measure-impact.sh    # Token measurement
+├── tests/                   # Test suite
+│   ├── test-basic.sh
+│   ├── test-bulk-operations.sh
+│   ├── test-context-impact.sh
+│   ├── test-health-check.sh
+│   ├── test-usage-analytics.sh
+│   └── run-all-tests.sh
+├── install.sh               # First-time setup
+├── mcp-toggle               # Main CLI (no .sh extension)
+├── mcp-auto-update.sh       # Auto-update (sourced by .zshrc)
 ├── README.md                # Main documentation
 ├── CONTRIBUTING.md          # This file
 ├── CHANGELOG.md             # Version history

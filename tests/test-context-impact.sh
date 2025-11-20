@@ -72,7 +72,7 @@ test_info_command() {
     local config=$(setup_test_config)
 
     # Test that info command works
-    local output=$("$PROJECT_ROOT/mcp-toggle.sh" --config "$config" info filesystem 2>/dev/null)
+    local output=$("$PROJECT_ROOT/mcp-toggle" --config "$config" info filesystem 2>/dev/null)
     if echo "$output" | grep -q "filesystem"; then
         pass "Info command returns server information"
     else
@@ -88,7 +88,7 @@ test_info_shows_impact() {
 
     local config=$(setup_test_config)
 
-    local output=$("$PROJECT_ROOT/mcp-toggle.sh" --config "$config" info filesystem 2>/dev/null)
+    local output=$("$PROJECT_ROOT/mcp-toggle" --config "$config" info filesystem 2>/dev/null)
 
     # Check for impact indicator (Heavy/Medium/Light)
     if echo "$output" | grep -qiE "impact|tokens|context"; then
@@ -106,7 +106,7 @@ test_list_shows_impact() {
 
     local config=$(setup_test_config)
 
-    local output=$("$PROJECT_ROOT/mcp-toggle.sh" --config "$config" list 2>/dev/null)
+    local output=$("$PROJECT_ROOT/mcp-toggle" --config "$config" list 2>/dev/null)
 
     # Should show servers with some indication of impact
     if echo "$output" | grep -q "filesystem"; then
@@ -124,7 +124,7 @@ test_info_unknown_server() {
 
     local config=$(setup_test_config)
 
-    if ! "$PROJECT_ROOT/mcp-toggle.sh" --config "$config" info nonexistent-server 2>/dev/null; then
+    if ! "$PROJECT_ROOT/mcp-toggle" --config "$config" info nonexistent-server 2>/dev/null; then
         pass "Info correctly handles unknown servers"
     else
         fail "Info should fail for unknown servers"
@@ -140,8 +140,8 @@ test_known_servers_metadata() {
     local config=$(setup_test_config)
 
     # Check if filesystem (heavy) and brave-search (light) have different ratings
-    local fs_output=$("$PROJECT_ROOT/mcp-toggle.sh" --config "$config" info filesystem 2>/dev/null || echo "")
-    local brave_output=$("$PROJECT_ROOT/mcp-toggle.sh" --config "$config" info brave-search 2>/dev/null || echo "")
+    local fs_output=$("$PROJECT_ROOT/mcp-toggle" --config "$config" info filesystem 2>/dev/null || echo "")
+    local brave_output=$("$PROJECT_ROOT/mcp-toggle" --config "$config" info brave-search 2>/dev/null || echo "")
 
     if [[ -n "$fs_output" && -n "$brave_output" ]]; then
         pass "Info provides data for known servers"
@@ -158,7 +158,7 @@ test_info_shows_capabilities() {
 
     local config=$(setup_test_config)
 
-    local output=$("$PROJECT_ROOT/mcp-toggle.sh" --config "$config" info filesystem 2>/dev/null)
+    local output=$("$PROJECT_ROOT/mcp-toggle" --config "$config" info filesystem 2>/dev/null)
 
     # Should mention what the server does
     if echo "$output" | grep -qiE "file|read|write|operations"; then

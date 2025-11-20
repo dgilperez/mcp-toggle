@@ -102,10 +102,10 @@ Before submitting a PR:
 jq . data/mcp-cache.json > /dev/null && echo "Valid JSON"
 
 # Test the discover command
-./mcp-toggle.sh discover
+./mcp-toggle discover
 
 # Test metadata for specific server
-./mcp-toggle.sh info your-server
+./mcp-toggle info your-server
 ```
 
 ## 5. Local Overrides

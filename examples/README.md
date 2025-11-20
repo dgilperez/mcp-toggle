@@ -69,7 +69,7 @@ Example JSON configuration demonstrating:
 4. Sync to your editors:
    ```bash
    cd ..
-   ./sync-all.sh
+   ./bin/sync-all.sh
    ```
 
 ## Creating Your Own Custom Server
@@ -126,14 +126,14 @@ source ~/.zshrc
 
 ```bash
 # Sync to all editors
-./sync-all.sh
+./bin/sync-all.sh
 
 # Test in Claude
 claude --print "Use your-server-name to test functionality"
 
 # Toggle if needed
-./mcp-toggle.sh disable your-server-name
-./mcp-toggle.sh enable your-server-name
+./mcp-toggle disable your-server-name
+./mcp-toggle enable your-server-name
 ```
 
 ## Best Practices
@@ -157,7 +157,7 @@ claude --print "Use your-server-name to test functionality"
 1. **Disable unused servers**: To reduce startup time
 2. **Keep config even when disabled**: Use `_disabled_mcpServers`
 3. **Test after toggling**: Ensure editors pick up changes
-4. **Use health-check**: `../health-check.sh` to verify setup
+4. **Use health-check**: `../bin/health-check.sh` to verify setup
 
 ## Troubleshooting
 
@@ -175,12 +175,12 @@ claude --print "Use your-server-name to test functionality"
 
 3. Check it's not disabled:
    ```bash
-   ./mcp-toggle.sh status your-server
+   ./mcp-toggle status your-server
    ```
 
 4. Re-sync configs:
    ```bash
-   ./sync-all.sh
+   ./bin/sync-all.sh
    ```
 
 5. Restart Claude

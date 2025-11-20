@@ -41,7 +41,7 @@ done
 
 echo ""
 echo "✅ Essential servers installed"
-echo "💡 Discover more servers with: ./mcp-toggle.sh discover"
+echo "💡 Discover more servers with: ./mcp-toggle discover"
 echo ""
 
 # Generate the global MCP configuration
@@ -106,10 +106,9 @@ echo "📍 Installation: $MCP_SERVERS"
 echo "📄 Config: $MCP_CONFIG"
 echo ""
 echo "Next steps:"
-echo "1. Update Claude config: ./update-claude-config.sh"
-echo "2. Sync to other tools: ./sync-all.sh"
-echo "3. Discover more servers: ./mcp-toggle.sh discover"
+echo "1. Sync to all editors: ./bin/sync-all.sh"
+echo "2. Discover more servers: ./mcp-toggle discover"
 echo ""
 echo "Add more servers:"
 echo "  cd ~/.mcp/servers && npm install @modelcontextprotocol/server-github"
-echo "  Then add to config manually or use mcp-toggle.sh"
+echo "  Then add to config manually or use mcp-toggle"

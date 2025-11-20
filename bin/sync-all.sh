@@ -30,11 +30,30 @@ substitute_env_vars() {
 
 sync_to_claude() {
     echo "📝 Claude Code:"
-    if [ -f ~/.claude.json ]; then
-        echo "   ✅ Already using global MCP config"
-    else
-        echo "   ❌ Claude config not found"
+    CLAUDE_CONFIG="$HOME/.claude.json"
+
+    # Backup current config if it exists
+    if [ -f "$CLAUDE_CONFIG" ]; then
+        cp "$CLAUDE_CONFIG" "$CLAUDE_CONFIG.backup.$(date +%Y%m%d_%H%M%S)"
+        echo "   💾 Backup created"
     fi
+
+    # Extract mcpServers from global config and substitute env vars
+    temp_file=$(substitute_env_vars "$GLOBAL_CONFIG")
+
+    if [ -f "$CLAUDE_CONFIG" ]; then
+        # Update existing config, preserving other settings
+        jq --slurpfile mcp "$temp_file" '.mcpServers = $mcp[0].mcpServers' "$CLAUDE_CONFIG" > "$CLAUDE_CONFIG.tmp"
+        mv "$CLAUDE_CONFIG.tmp" "$CLAUDE_CONFIG"
+        echo "   ✅ Config updated at ~/.claude.json"
+    else
+        # Create new config with just mcpServers
+        jq '{mcpServers: .mcpServers}' "$temp_file" > "$CLAUDE_CONFIG"
+        echo "   ✅ Config created at ~/.claude.json"
+    fi
+
+    rm "$temp_file"
+    echo "   📊 Servers available: $(jq -r '.mcpServers | keys | length' "$CLAUDE_CONFIG" 2>/dev/null || echo "unknown")"
     echo ""
 }
 

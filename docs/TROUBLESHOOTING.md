@@ -91,7 +91,7 @@ mv ~/.mcp/global-config.json ~/.mcp/global-config.json.backup
 
 ### Server toggle not working
 
-**Symptoms**: `mcp-toggle.sh enable/disable` doesn't change server status
+**Symptoms**: `mcp-toggle enable/disable` doesn't change server status
 
 **Diagnosis**:
 
@@ -100,7 +100,7 @@ mv ~/.mcp/global-config.json ~/.mcp/global-config.json.backup
 jq . ~/.mcp/global-config.json
 
 # Check if server exists
-./mcp-toggle.sh list | grep your-server
+./mcp-toggle list | grep your-server
 ```
 
 **Solutions**:
@@ -115,7 +115,7 @@ jq . ~/.mcp/global-config.json
 2. **Server doesn't exist**:
    ```bash
    # Check server name spelling
-   ./mcp-toggle.sh list
+   ./mcp-toggle list
    ```
 
 3. **Permissions issue**:
@@ -133,7 +133,7 @@ jq . ~/.mcp/global-config.json
 
 2. **Re-sync configurations**:
    ```bash
-   ./sync-all.sh
+   ./bin/sync-all.sh
    ```
 
 3. **Check editor-specific config**:
@@ -177,13 +177,13 @@ jq '.mcpServers | keys' ~/.claude.json
 
 2. **Server disabled**:
    ```bash
-   ./mcp-toggle.sh enable server-name
-   ./sync-all.sh
+   ./mcp-toggle enable server-name
+   ./bin/sync-all.sh
    ```
 
 3. **Not in Claude config**:
    ```bash
-   ./update-claude-config.sh
+   
    ```
 
 4. **Restart Claude**:
@@ -303,8 +303,8 @@ jq '.mcpServers.brave.command' ~/.claude.json
 1. **Still using npx**:
    ```bash
    # Re-run config update
-   ./update-claude-config.sh
-   ./sync-all.sh
+   
+   ./bin/sync-all.sh
    ```
 
 2. **Using Smithery**:
@@ -313,14 +313,14 @@ jq '.mcpServers.brave.command' ~/.claude.json
    rm ~/.claude/smithery-config.json  # if exists
 
    # Ensure using global config
-   ./update-claude-config.sh
+   
    ```
 
 3. **Old config cached**:
    ```bash
    # Backup and regenerate
    mv ~/.claude.json ~/.claude.json.old
-   ./update-claude-config.sh
+   
    ```
 
 ### Server takes long to respond
@@ -360,7 +360,7 @@ top  # Look for CPU/memory usage
 
 ```bash
 # Run sync with verbose output
-./sync-all.sh
+./bin/sync-all.sh
 
 # Check if files were created
 ls -la ~/.claude.json
@@ -378,7 +378,7 @@ ls -la ~/.codeium/windsurf/mcp.json
    mkdir -p ~/.config/zed
 
    # Try again
-   ./sync-all.sh
+   ./bin/sync-all.sh
    ```
 
 2. **Permission issues**:
@@ -420,7 +420,7 @@ cat ~/.claude.json
    cp ~/.mcp/global-config.json.backup ~/.mcp/global-config.json
 
    # Then re-sync
-   ./sync-all.sh
+   ./bin/sync-all.sh
    ```
 
 ---
@@ -599,7 +599,7 @@ jq '.mcpServers.server-name' ~/.mcp/global-config.json
 Run the health check script to diagnose multiple issues at once:
 
 ```bash
-./health-check.sh
+./bin/health-check.sh
 ```
 
 This checks:
@@ -620,7 +620,7 @@ node --version
 npm --version
 
 # MCP Toggle status
-./mcp-toggle.sh list
+./mcp-toggle list
 cat ~/.cache/mcp/.mcp-update
 
 # Configuration
@@ -656,13 +656,13 @@ When creating an issue, include:
 
 ```bash
 # Diagnosis
-./mcp-toggle.sh list              # List all servers
-./health-check.sh                 # Run health check
+./mcp-toggle list              # List all servers
+./bin/health-check.sh                 # Run health check
 jq . ~/.mcp/global-config.json    # Validate config
 
 # Fixes
-./sync-all.sh                     # Re-sync all configs
-./update-claude-config.sh         # Update Claude specifically
+./bin/sync-all.sh                     # Re-sync all configs
+         # Update Claude specifically
 mcp-update                        # Update all packages
 source ~/.zshrc                   # Reload environment vars
 

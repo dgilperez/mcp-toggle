@@ -50,14 +50,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - **Project Rename**: Renamed from "mcp-global-setup" to "MCP Toggle" to better reflect core functionality
 - **Server Toggle Feature**: Enable/disable MCP servers without losing configuration
-  - `mcp-toggle.sh list` - List all servers and their status
-  - `mcp-toggle.sh disable <server>` - Disable a server (moves to _disabled_mcpServers)
-  - `mcp-toggle.sh enable <server>` - Enable a server
-  - `mcp-toggle.sh status <server>` - Check if server is enabled or disabled
+  - `mcp-toggle list` - List all servers and their status
+  - `mcp-toggle disable <server>` - Disable a server (moves to _disabled_mcpServers)
+  - `mcp-toggle enable <server>` - Enable a server
+  - `mcp-toggle status <server>` - Check if server is enabled or disabled
 - **Server Discovery**: Browse and install from curated list of 50+ MCP servers
-  - `mcp-toggle.sh discover` - Show all curated servers
-  - `mcp-toggle.sh discover <category>` - Filter by category (database, productivity, dev-tools, etc.)
-  - `mcp-toggle.sh discover --search <term>` - Search npm for MCP servers
+  - `mcp-toggle discover` - Show all curated servers
+  - `mcp-toggle discover <category>` - Filter by category (database, productivity, dev-tools, etc.)
+  - `mcp-toggle discover --search <term>` - Search npm for MCP servers
 - **Multi-Editor Sync**: Automatically sync MCP configuration across editors
   - Claude Code support
   - Cursor support
@@ -172,7 +172,7 @@ If you were using the pre-release "mcp-global-setup" version:
 
 5. **Run Health Check**:
    ```bash
-   ./health-check.sh
+   ./bin/health-check.sh
    ```
 
 All your MCP servers and configurations in `~/.mcp/` are fully compatible - no changes needed!

@@ -4,10 +4,10 @@
 # Enable/disable MCP servers without losing configuration
 #
 # Usage:
-#   ./mcp-toggle.sh enable <server-name>
-#   ./mcp-toggle.sh disable <server-name>
-#   ./mcp-toggle.sh status [server-name]
-#   ./mcp-toggle.sh list
+#   ./mcp-toggle enable <server-name>
+#   ./mcp-toggle disable <server-name>
+#   ./mcp-toggle info [server-name]
+#   ./mcp-toggle list
 #
 
 set -e
@@ -662,7 +662,7 @@ show_curated_servers() {
     echo ""
     echo -e "${BLUE}To install a server:${NC}"
     echo "  cd ~/.mcp/servers && npm install <package-name>"
-    echo "  Then add to Claude config and sync: ./sync-all.sh"
+    echo "  Then add to Claude config and sync: ./bin/sync-all.sh"
     echo ""
     echo -e "${BLUE}Categories:${NC}"
     while IFS= read -r cat; do

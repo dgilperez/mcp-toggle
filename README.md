@@ -60,10 +60,10 @@ source ~/.zshrc  # or source ~/.bashrc
 
 ```bash
 # Update Claude config
-./update-claude-config.sh
+
 
 # Sync to all tools (Claude, Cursor, Windsurf, Zed, VSCode)
-./sync-all.sh
+./bin/sync-all.sh
 ```
 
 ## Core Features
@@ -74,18 +74,18 @@ Enable and disable MCP servers without losing their configuration:
 
 ```bash
 # List all servers and their status (or just run without args)
-./mcp-toggle.sh
-./mcp-toggle.sh info
+./mcp-toggle
+./mcp-toggle info
 
 # Disable a server (moves to _disabled_mcpServers)
-./mcp-toggle.sh disable figma
+./mcp-toggle disable figma
 
 # Enable a server (moves back to mcpServers)
-./mcp-toggle.sh enable figma
+./mcp-toggle enable figma
 
 # Bulk operations - enable/disable multiple servers at once
-./mcp-toggle.sh enable figma puppeteer notion
-./mcp-toggle.sh disable github brave-search
+./mcp-toggle enable figma puppeteer notion
+./mcp-toggle disable github brave-search
 ```
 
 Disabled servers are kept in `_disabled_mcpServers` section - they're not loaded but configuration is preserved.
@@ -96,7 +96,7 @@ Check health of all servers or get detailed info for a specific server:
 
 ```bash
 # Health check ALL enabled servers
-./mcp-toggle.sh info
+./mcp-toggle info
 
 # Shows for each server:
 # - Status with impact indicator (🔴 Heavy, 🟡 Medium, 🟢 Light)
@@ -105,7 +105,7 @@ Check health of all servers or get detailed info for a specific server:
 # - Summary with issue count and recommendations
 
 # Detailed info for specific server
-./mcp-toggle.sh info filesystem
+./mcp-toggle info filesystem
 
 # Shows:
 # - Status: ENABLED/DISABLED
@@ -126,15 +126,15 @@ Browse curated servers or search npm - all in one command:
 
 ```bash
 # Show curated list of popular servers
-./mcp-toggle.sh discover
+./mcp-toggle discover
 
 # Browse by category
-./mcp-toggle.sh discover database      # Database-related servers
-./mcp-toggle.sh discover productivity  # Productivity tools
-./mcp-toggle.sh discover dev-tools     # Development tools
+./mcp-toggle discover database      # Database-related servers
+./mcp-toggle discover productivity  # Productivity tools
+./mcp-toggle discover dev-tools     # Development tools
 
 # Search npm for anything else
-./mcp-toggle.sh discover weather       # Searches npm if not a known category
+./mcp-toggle discover weather       # Searches npm if not a known category
 ```
 
 The discover feature includes 15+ curated categories with impact indicators:
@@ -151,7 +151,7 @@ Get insights into your server configuration and receive recommendations:
 
 ```bash
 # Show statistics and recommendations
-./mcp-toggle.sh stats
+./mcp-toggle stats
 ```
 
 Displays:
@@ -166,7 +166,7 @@ Sync your MCP configuration across multiple editors:
 
 ```bash
 # Sync to all supported editors
-./sync-all.sh
+./bin/sync-all.sh
 
 # This updates:
 # - Claude Code (~/.claude.json)
@@ -310,7 +310,7 @@ npm install @org/new-mcp-server
 
 3. Sync to all tools:
 ```bash
-./sync-all.sh
+./bin/sync-all.sh
 ```
 
 ### Check Installed Versions
@@ -338,7 +338,7 @@ After installation, you'll have:
 
 Discover and install more:
 ```bash
-./mcp-toggle.sh discover      # Browse 50+ curated servers
+./mcp-toggle discover      # Browse 50+ curated servers
 cd ~/.mcp/servers && npm install @modelcontextprotocol/server-github
 # Then add to config and sync
 ```
@@ -366,7 +366,7 @@ cat ~/.mcp/global-config.json | jq '.mcpServers | keys'
 
 3. Check server info:
 ```bash
-./mcp-toggle.sh info your-server
+./mcp-toggle info your-server
 ```
 
 4. Restart your editor if needed

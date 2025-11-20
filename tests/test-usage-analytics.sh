@@ -79,7 +79,7 @@ test_stats_command() {
 
     local config=$(setup_test_config)
 
-    if "$PROJECT_ROOT/mcp-toggle.sh" --config "$config" stats 2>/dev/null >/dev/null; then
+    if "$PROJECT_ROOT/mcp-toggle" --config "$config" stats 2>/dev/null >/dev/null; then
         pass "Stats command runs successfully"
     else
         fail "Stats command failed or missing"
@@ -94,7 +94,7 @@ test_stats_shows_counts() {
 
     local config=$(setup_test_config)
 
-    local output=$("$PROJECT_ROOT/mcp-toggle.sh" --config "$config" stats 2>/dev/null)
+    local output=$("$PROJECT_ROOT/mcp-toggle" --config "$config" stats 2>/dev/null)
 
     # Should show counts (3 enabled, 2 disabled)
     if echo "$output" | grep -qE "[0-9]+.*enabled|Enabled.*[0-9]+"; then
@@ -118,7 +118,7 @@ test_stats_shows_impact() {
 
     local config=$(setup_test_config)
 
-    local output=$("$PROJECT_ROOT/mcp-toggle.sh" --config "$config" stats 2>/dev/null)
+    local output=$("$PROJECT_ROOT/mcp-toggle" --config "$config" stats 2>/dev/null)
 
     # Should mention impact levels
     if echo "$output" | grep -qiE "heavy|medium|light|impact"; then
@@ -136,7 +136,7 @@ test_stats_shows_recommendations() {
 
     local config=$(setup_test_config)
 
-    local output=$("$PROJECT_ROOT/mcp-toggle.sh" --config "$config" stats 2>/dev/null)
+    local output=$("$PROJECT_ROOT/mcp-toggle" --config "$config" stats 2>/dev/null)
 
     # Should provide some guidance or recommendations
     if echo "$output" | grep -qiE "recommendation|consider|tip|suggestion|context"; then
@@ -160,7 +160,7 @@ test_stats_empty_config() {
 }
 EOF
 
-    local output=$("$PROJECT_ROOT/mcp-toggle.sh" --config "$config" stats 2>/dev/null)
+    local output=$("$PROJECT_ROOT/mcp-toggle" --config "$config" stats 2>/dev/null)
     if echo "$output" | grep -qE "0|none|empty"; then
         pass "Stats handles empty config gracefully"
     else
@@ -176,7 +176,7 @@ test_stats_total_impact() {
 
     local config=$(setup_test_config)
 
-    local output=$("$PROJECT_ROOT/mcp-toggle.sh" --config "$config" stats 2>/dev/null)
+    local output=$("$PROJECT_ROOT/mcp-toggle" --config "$config" stats 2>/dev/null)
 
     # Should show some total or summary
     if echo "$output" | grep -qiE "total|overall|combined|context"; then

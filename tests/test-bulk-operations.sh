@@ -81,7 +81,7 @@ test_bulk_enable() {
     local config=$(setup_test_config)
 
     # Test enabling 2 servers at once
-    if "$PROJECT_ROOT/mcp-toggle.sh" --config "$config" enable test-server-4 test-server-5 2>/dev/null; then
+    if "$PROJECT_ROOT/mcp-toggle" --config "$config" enable test-server-4 test-server-5 2>/dev/null; then
         # Check both servers are now in mcpServers
         local count=$(jq -r '.mcpServers | keys | map(select(. == "test-server-4" or . == "test-server-5")) | length' "$config")
         if [[ "$count" == "2" ]]; then
@@ -111,7 +111,7 @@ test_bulk_disable() {
     local config=$(setup_test_config)
 
     # Test disabling 2 servers at once
-    if "$PROJECT_ROOT/mcp-toggle.sh" --config "$config" disable test-server-1 test-server-2 2>/dev/null; then
+    if "$PROJECT_ROOT/mcp-toggle" --config "$config" disable test-server-1 test-server-2 2>/dev/null; then
         # Check both servers are now in _disabled_mcpServers
         local count=$(jq -r '._disabled_mcpServers | keys | map(select(. == "test-server-1" or . == "test-server-2")) | length' "$config")
         if [[ "$count" == "2" ]]; then
@@ -141,7 +141,7 @@ test_mixed_servers() {
     local config=$(setup_test_config)
 
     # Try to enable one valid and one invalid server
-    if "$PROJECT_ROOT/mcp-toggle.sh" --config "$config" enable test-server-4 nonexistent-server 2>/dev/null; then
+    if "$PROJECT_ROOT/mcp-toggle" --config "$config" enable test-server-4 nonexistent-server 2>/dev/null; then
         fail "Should fail with invalid server in list"
     else
         pass "Correctly rejects bulk operation with invalid server"
@@ -164,7 +164,7 @@ test_empty_list() {
 
     local config=$(setup_test_config)
 
-    if "$PROJECT_ROOT/mcp-toggle.sh" --config "$config" enable 2>/dev/null; then
+    if "$PROJECT_ROOT/mcp-toggle" --config "$config" enable 2>/dev/null; then
         fail "Should reject empty server list"
     else
         pass "Correctly rejects empty server list"
@@ -183,7 +183,7 @@ test_backup_created() {
     # Override backup directory for testing
     export MCP_BACKUP_DIR="$backup_dir"
 
-    "$PROJECT_ROOT/mcp-toggle.sh" --config "$config" enable test-server-4 test-server-5 2>/dev/null
+    "$PROJECT_ROOT/mcp-toggle" --config "$config" enable test-server-4 test-server-5 2>/dev/null
 
     # Check if backup was created (claude-config-*.json pattern)
     if ls "$backup_dir"/claude-config-*.json 2>/dev/null | grep -q .; then
@@ -203,7 +203,7 @@ test_idempotent_enable() {
     local config=$(setup_test_config)
 
     # Enable servers that are already enabled
-    if "$PROJECT_ROOT/mcp-toggle.sh" --config "$config" enable test-server-1 test-server-2 2>/dev/null; then
+    if "$PROJECT_ROOT/mcp-toggle" --config "$config" enable test-server-1 test-server-2 2>/dev/null; then
         pass "Enable accepts already-enabled servers"
     else
         fail "Enable rejects already-enabled servers"
@@ -222,7 +222,7 @@ test_preserves_config() {
     local original=$(jq -c '._disabled_mcpServers["test-server-4"]' "$config")
 
     # Enable it
-    "$PROJECT_ROOT/mcp-toggle.sh" --config "$config" enable test-server-4 2>/dev/null
+    "$PROJECT_ROOT/mcp-toggle" --config "$config" enable test-server-4 2>/dev/null
 
     # Check config is preserved
     local new_config=$(jq -c '.mcpServers["test-server-4"]' "$config")

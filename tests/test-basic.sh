@@ -38,11 +38,10 @@ test_core_scripts_exist() {
     test_header "Core scripts exist"
 
     if [[ -f "$PROJECT_ROOT/install.sh" ]]; then pass "install.sh exists"; else fail "install.sh missing"; fi
-    if [[ -f "$PROJECT_ROOT/mcp-toggle.sh" ]]; then pass "mcp-toggle.sh exists"; else fail "mcp-toggle.sh missing"; fi
-    if [[ -f "$PROJECT_ROOT/sync-all.sh" ]]; then pass "sync-all.sh exists"; else fail "sync-all.sh missing"; fi
-    if [[ -f "$PROJECT_ROOT/health-check.sh" ]]; then pass "health-check.sh exists"; else fail "health-check.sh missing"; fi
+    if [[ -f "$PROJECT_ROOT/mcp-toggle" ]]; then pass "mcp-toggle exists"; else fail "mcp-toggle missing"; fi
+    if [[ -f "$PROJECT_ROOT/bin/sync-all.sh" ]]; then pass "bin/sync-all.sh exists"; else fail "bin/sync-all.sh missing"; fi
+    if [[ -f "$PROJECT_ROOT/bin/health-check.sh" ]]; then pass "bin/health-check.sh exists"; else fail "bin/health-check.sh missing"; fi
     if [[ -f "$PROJECT_ROOT/mcp-auto-update.sh" ]]; then pass "mcp-auto-update.sh exists"; else fail "mcp-auto-update.sh missing"; fi
-    if [[ -f "$PROJECT_ROOT/update-claude-config.sh" ]]; then pass "update-claude-config.sh exists"; else fail "update-claude-config.sh missing"; fi
 }
 
 # Test 2: Check scripts are executable
@@ -50,9 +49,9 @@ test_scripts_executable() {
     test_header "Scripts are executable"
 
     if [[ -x "$PROJECT_ROOT/install.sh" ]]; then pass "install.sh is executable"; else fail "install.sh not executable"; fi
-    if [[ -x "$PROJECT_ROOT/mcp-toggle.sh" ]]; then pass "mcp-toggle.sh is executable"; else fail "mcp-toggle.sh not executable"; fi
-    if [[ -x "$PROJECT_ROOT/sync-all.sh" ]]; then pass "sync-all.sh is executable"; else fail "sync-all.sh not executable"; fi
-    if [[ -x "$PROJECT_ROOT/health-check.sh" ]]; then pass "health-check.sh is executable"; else fail "health-check.sh not executable"; fi
+    if [[ -x "$PROJECT_ROOT/mcp-toggle" ]]; then pass "mcp-toggle is executable"; else fail "mcp-toggle not executable"; fi
+    if [[ -x "$PROJECT_ROOT/bin/sync-all.sh" ]]; then pass "bin/sync-all.sh is executable"; else fail "bin/sync-all.sh not executable"; fi
+    if [[ -x "$PROJECT_ROOT/bin/health-check.sh" ]]; then pass "bin/health-check.sh is executable"; else fail "bin/health-check.sh not executable"; fi
 }
 
 # Test 3: Check documentation exists
