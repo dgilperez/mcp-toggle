@@ -153,6 +153,28 @@ show_server_info() {
 
             echo -e "${BLUE}Checking:${NC} $impact_indicator $server ${BLUE}($impact)${NC}"
 
+            # Show installation path
+            local package_name=$(jq -r --arg s "$server" '.servers[$s].package // empty' "$MCP_CACHE" 2>/dev/null)
+            if [ -z "$package_name" ]; then
+                package_name=$(jq -r --arg s "$server" '.servers[$s].package // empty' "$LOCAL_OVERRIDE" 2>/dev/null)
+            fi
+
+            if [ -n "$package_name" ]; then
+                local install_path="$HOME/.mcp/servers/node_modules/$package_name"
+                if [ -d "$install_path" ]; then
+                    echo -e "  ${BLUE}Path:${NC} $install_path"
+                else
+                    # Try to extract from args in config
+                    local args_path=$(jq -r ".mcpServers.\"$server\".args[0] // empty" "$CLAUDE_CONFIG" 2>/dev/null)
+                    if [ -n "$args_path" ]; then
+                        install_path=$(dirname "$(dirname "$args_path")")
+                        if [ -d "$install_path" ]; then
+                            echo -e "  ${BLUE}Path:${NC} $install_path"
+                        fi
+                    fi
+                fi
+            fi
+
             local server_issues=0
 
             # Get server config
