@@ -92,10 +92,19 @@ Disabled servers are kept in `_disabled_mcpServers` section - they're not loaded
 
 ### 2. Server Information & Health
 
-View comprehensive server info including status, token impact, and health checks:
+Check health of all servers or get detailed info for a specific server:
 
 ```bash
-# See detailed info including status, impact, configuration, health
+# Health check ALL enabled servers
+./mcp-toggle.sh info
+
+# Shows for each server:
+# - Status with impact indicator (🔴 Heavy, 🟡 Medium, 🟢 Light)
+# - Command availability check
+# - Environment variables check
+# - Summary with issue count and recommendations
+
+# Detailed info for specific server
 ./mcp-toggle.sh info filesystem
 
 # Shows:

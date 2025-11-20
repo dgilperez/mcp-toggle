@@ -113,10 +113,104 @@ get_server_metadata() {
 show_server_info() {
     local server_name="$1"
 
-    # If no server specified, list all servers
+    # If no server specified, show health check for ALL enabled servers
     if [ -z "$server_name" ]; then
-        list_servers
-        return
+        echo -e "${BLUE}=== MCP Servers Health Check ===${NC}\n"
+
+        local total_checked=0
+        local issues_found=0
+        local servers_to_check=()
+
+        # Get all enabled servers
+        while IFS= read -r server; do
+            [ -n "$server" ] && servers_to_check+=("$server")
+        done < <(jq -r '.mcpServers // {} | keys[]' "$CLAUDE_CONFIG" 2>/dev/null)
+
+        if [ ${#servers_to_check[@]} -eq 0 ]; then
+            echo -e "${YELLOW}No enabled servers found${NC}"
+            echo ""
+            echo -e "${BLUE}Tip:${NC} Run 'mcp-toggle discover' to find servers"
+            return 0
+        fi
+
+        # Check each server
+        for server in "${servers_to_check[@]}"; do
+            ((total_checked++))
+
+            # Get metadata
+            local metadata=$(get_server_metadata "$server")
+            local impact=$(echo "$metadata" | cut -d'|' -f1)
+            local description=$(echo "$metadata" | cut -d'|' -f4-)
+
+            # Impact indicator
+            local impact_indicator=""
+            case "$impact" in
+                Heavy) impact_indicator="${RED}⬤${NC}" ;;
+                Medium) impact_indicator="${YELLOW}⬤${NC}" ;;
+                Light) impact_indicator="${GREEN}⬤${NC}" ;;
+                *) impact_indicator="⚪" ;;
+            esac
+
+            echo -e "${BLUE}Checking:${NC} $impact_indicator $server ${BLUE}($impact)${NC}"
+
+            local server_issues=0
+
+            # Get server config
+            local command=$(jq -r ".mcpServers.\"$server\".command" "$CLAUDE_CONFIG" 2>/dev/null)
+
+            # Check command availability
+            if [ -n "$command" ] && [ "$command" != "null" ]; then
+                if command -v "$command" &>/dev/null; then
+                    echo -e "  ${GREEN}✓${NC} Command '$command' is available"
+                else
+                    echo -e "  ${RED}✗${NC} Command '$command' NOT FOUND"
+                    ((server_issues++))
+                fi
+            fi
+
+            # Check environment variables
+            local env_check_failed=false
+            while IFS= read -r env_value; do
+                if [ -n "$env_value" ] && [ "$env_value" != "null" ]; then
+                    local var_name=$(echo "$env_value" | sed 's/\${//;s/}//')
+
+                    if [ -n "${!var_name:-}" ]; then
+                        echo -e "  ${GREEN}✓${NC} Environment variable $var_name is set"
+                    else
+                        echo -e "  ${RED}✗${NC} Environment variable $var_name NOT SET"
+                        ((server_issues++))
+                        env_check_failed=true
+                    fi
+                fi
+            done < <(jq -r ".mcpServers.\"$server\".env // {} | to_entries[] | .value" "$CLAUDE_CONFIG" 2>/dev/null)
+
+            if [ $server_issues -eq 0 ]; then
+                echo -e "  ${GREEN}Status: Healthy${NC}"
+            else
+                echo -e "  ${YELLOW}Status: Issues found ($server_issues)${NC}"
+                ((issues_found+=server_issues))
+            fi
+            echo ""
+        done
+
+        # Summary
+        echo -e "${BLUE}=== Summary ===${NC}"
+        echo -e "  Servers checked: $total_checked"
+        if [ $issues_found -eq 0 ]; then
+            echo -e "  ${GREEN}✓ All checks passed!${NC}"
+            echo -e "  ${GREEN}All enabled servers are healthy${NC}"
+        else
+            echo -e "  ${YELLOW}⚠ Issues found: $issues_found${NC}"
+            echo ""
+            echo -e "${YELLOW}Recommendations:${NC}"
+            echo "  - Install missing commands (e.g., 'brew install node')"
+            echo "  - Set missing environment variables in ~/.zshrc or ~/.bashrc"
+            echo "  - Run 'source ~/.zshrc' to reload environment"
+            echo ""
+            echo -e "${BLUE}Tip:${NC} Check specific server with: mcp-toggle info <server-name>"
+        fi
+
+        return $([ $issues_found -eq 0 ] && echo 0 || echo 1)
     fi
 
     echo -e "${BLUE}=== Server Information: $server_name ===${NC}\n"
@@ -711,8 +805,8 @@ show_help() {
     echo -e "${GREEN}Usage:${NC}"
     echo "  mcp-toggle enable <server-name...>    Enable disabled server(s)"
     echo "  mcp-toggle disable <server-name...>   Disable enabled server(s)"
-    echo "  mcp-toggle info [server-name]         Show server info (status, impact, health)"
-    echo "  mcp-toggle list                       List all servers (same as 'info')"
+    echo "  mcp-toggle info [server-name]         Health check all servers OR specific server info"
+    echo "  mcp-toggle list                       List all servers (enabled and disabled)"
     echo "  mcp-toggle stats                      Show usage statistics and recommendations"
     echo "  mcp-toggle restart [server-name]      Show how to restart MCP servers"
     echo "  mcp-toggle discover [query]           Discover or search for MCP servers"
@@ -720,7 +814,8 @@ show_help() {
     echo ""
     echo -e "${GREEN}Examples:${NC}"
     echo "  mcp-toggle                            List all servers (enabled and disabled)"
-    echo "  mcp-toggle info filesystem            Show detailed server info + health check"
+    echo "  mcp-toggle info                       Health check ALL enabled servers"
+    echo "  mcp-toggle info filesystem            Show detailed server info + health"
     echo "  mcp-toggle enable figma puppeteer     Enable multiple servers at once"
     echo "  mcp-toggle disable github brave       Disable multiple servers at once"
     echo "  mcp-toggle stats                      Show statistics and recommendations"
@@ -733,7 +828,8 @@ show_help() {
     echo "  - Configuration is preserved when disabling"
     echo "  - Backups are created automatically in ~/.mcp/backups/"
     echo "  - Disabled servers are stored in _disabled_mcpServers"
-    echo "  - 'info' command includes health check for enabled servers"
+    echo "  - 'info' with no args checks health of ALL enabled servers"
+    echo "  - 'info <server>' shows detailed info + health for one server"
     echo ""
     echo -e "${BLUE}File Locations:${NC}"
     echo "  Config:  $CLAUDE_CONFIG"
@@ -763,8 +859,11 @@ main() {
         disable)
             disable_server "$@"
             ;;
-        info|list)
+        info)
             show_server_info "$1"
+            ;;
+        list)
+            list_servers
             ;;
         stats)
             show_stats
