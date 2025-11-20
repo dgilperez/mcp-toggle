@@ -72,7 +72,8 @@ test_info_command() {
     local config=$(setup_test_config)
 
     # Test that info command works
-    if "$PROJECT_ROOT/mcp-toggle.sh" --config "$config" info filesystem 2>/dev/null | grep -q "filesystem"; then
+    local output=$("$PROJECT_ROOT/mcp-toggle.sh" --config "$config" info filesystem 2>/dev/null)
+    if echo "$output" | grep -q "filesystem"; then
         pass "Info command returns server information"
     else
         fail "Info command failed or missing"

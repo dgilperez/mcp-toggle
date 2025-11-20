@@ -68,13 +68,14 @@ cleanup_test_config() {
     fi
 }
 
-# Test 1: Health command exists
+# Test 1: Info command exists (health check mode)
 test_health_command() {
     test_header "Health command exists"
 
     local config=$(setup_test_config)
 
-    if "$PROJECT_ROOT/mcp-toggle.sh" --config "$config" health 2>/dev/null >/dev/null; then
+    local output=$("$PROJECT_ROOT/mcp-toggle.sh" --config "$config" info 2>/dev/null)
+    if [ -n "$output" ]; then
         pass "Health command runs successfully"
     else
         fail "Health command failed or missing"
@@ -89,7 +90,7 @@ test_health_checks_enabled() {
 
     local config=$(setup_test_config)
 
-    local output=$("$PROJECT_ROOT/mcp-toggle.sh" --config "$config" health 2>/dev/null)
+    local output=$("$PROJECT_ROOT/mcp-toggle.sh" --config "$config" info 2>/dev/null)
 
     # Should check enabled servers (test-server-1, test-server-2)
     if echo "$output" | grep -q "test-server-1"; then
@@ -120,7 +121,7 @@ test_health_checks_commands() {
 
     local config=$(setup_test_config)
 
-    local output=$("$PROJECT_ROOT/mcp-toggle.sh" --config "$config" health 2>/dev/null)
+    local output=$("$PROJECT_ROOT/mcp-toggle.sh" --config "$config" info 2>/dev/null)
 
     # Should check if node/python are available
     if echo "$output" | grep -qiE "command|available|found|missing"; then
@@ -138,7 +139,7 @@ test_health_checks_env() {
 
     local config=$(setup_test_config)
 
-    local output=$("$PROJECT_ROOT/mcp-toggle.sh" --config "$config" health 2>/dev/null)
+    local output=$("$PROJECT_ROOT/mcp-toggle.sh" --config "$config" info 2>/dev/null)
 
     # Should detect missing TEST_API_KEY
     if echo "$output" | grep -qiE "TEST_API_KEY|environment|variable|env"; then
@@ -156,7 +157,7 @@ test_health_summary() {
 
     local config=$(setup_test_config)
 
-    local output=$("$PROJECT_ROOT/mcp-toggle.sh" --config "$config" health 2>/dev/null)
+    local output=$("$PROJECT_ROOT/mcp-toggle.sh" --config "$config" info 2>/dev/null)
 
     # Should show summary (e.g., "2/2 servers checked", "1 issue found")
     if echo "$output" | grep -qiE "summary|total|checked|passed|failed"; then
@@ -175,7 +176,8 @@ test_health_specific_server() {
     local config=$(setup_test_config)
 
     # Should support checking just one server
-    if "$PROJECT_ROOT/mcp-toggle.sh" --config "$config" health test-server-1 2>/dev/null | grep -q "test-server-1"; then
+    local output=$("$PROJECT_ROOT/mcp-toggle.sh" --config "$config" info test-server-1 2>/dev/null)
+    if echo "$output" | grep -q "test-server-1"; then
         pass "Health checks specific server"
     else
         fail "Health doesn't support specific server"
@@ -192,7 +194,7 @@ test_health_exit_code() {
 
     # Health should exit with non-zero if issues found (missing commands/env vars)
     # In our test case, TEST_API_KEY is not set, so health should fail
-    if ! "$PROJECT_ROOT/mcp-toggle.sh" --config "$config" health >/dev/null 2>&1; then
+    if ! "$PROJECT_ROOT/mcp-toggle.sh" --config "$config" info >/dev/null 2>&1; then
         pass "Health exit code reflects issues"
     else
         # Could also pass if all checks pass

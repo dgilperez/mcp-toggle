@@ -160,7 +160,8 @@ test_stats_empty_config() {
 }
 EOF
 
-    if "$PROJECT_ROOT/mcp-toggle.sh" --config "$config" stats 2>/dev/null | grep -qE "0|none|empty"; then
+    local output=$("$PROJECT_ROOT/mcp-toggle.sh" --config "$config" stats 2>/dev/null)
+    if echo "$output" | grep -qE "0|none|empty"; then
         pass "Stats handles empty config gracefully"
     else
         fail "Stats fails on empty config"

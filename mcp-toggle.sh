@@ -154,9 +154,9 @@ show_server_info() {
             echo -e "${BLUE}Checking:${NC} $impact_indicator $server ${BLUE}($impact)${NC}"
 
             # Show installation path
-            local package_name=$(jq -r --arg s "$server" '.servers[$s].package // empty' "$MCP_CACHE" 2>/dev/null)
-            if [ -z "$package_name" ]; then
-                package_name=$(jq -r --arg s "$server" '.servers[$s].package // empty' "$LOCAL_OVERRIDE" 2>/dev/null)
+            local package_name=$(jq -r --arg s "$server" '.servers[$s].package // empty' "$MCP_CACHE" 2>/dev/null || echo "")
+            if [ -z "$package_name" ] && [ -f "$LOCAL_OVERRIDE" ]; then
+                package_name=$(jq -r --arg s "$server" '.servers[$s].package // empty' "$LOCAL_OVERRIDE" 2>/dev/null || echo "")
             fi
 
             if [ -n "$package_name" ]; then
@@ -274,9 +274,9 @@ show_server_info() {
     echo -e "${BLUE}Description:${NC} $description"
 
     # Try to find installation path
-    local package_name=$(jq -r --arg s "$server_name" '.servers[$s].package // empty' "$MCP_CACHE" 2>/dev/null)
-    if [ -z "$package_name" ]; then
-        package_name=$(jq -r --arg s "$server_name" '.servers[$s].package // empty' "$LOCAL_OVERRIDE" 2>/dev/null)
+    local package_name=$(jq -r --arg s "$server_name" '.servers[$s].package // empty' "$MCP_CACHE" 2>/dev/null || echo "")
+    if [ -z "$package_name" ] && [ -f "$LOCAL_OVERRIDE" ]; then
+        package_name=$(jq -r --arg s "$server_name" '.servers[$s].package // empty' "$LOCAL_OVERRIDE" 2>/dev/null || echo "")
     fi
 
     if [ -n "$package_name" ]; then
@@ -523,23 +523,24 @@ discover_servers() {
         return
     fi
 
+    # Check if cache exists
+    if [ ! -f "$MCP_CACHE" ]; then
+        echo -e "${RED}Error: MCP cache not found${NC}"
+        echo "Falling back to npm search..."
+        search_npm "$arg"
+        return
+    fi
+
     # Check if it's a known category
     local all_categories=$(jq -r '.categories | keys[]' "$MCP_CACHE" 2>/dev/null)
     local is_category=false
 
     while IFS= read -r cat; do
-        if [[ "$arg" == "$cat" ]] || [[ "$arg" == "${cat%-*}" ]]; then
+        if [[ "$arg" == "$cat" ]]; then
             is_category=true
             break
         fi
     done <<< "$all_categories"
-
-    # Category aliases
-    case "$arg" in
-        db) arg="database"; is_category=true ;;
-        prod) arg="productivity"; is_category=true ;;
-        dev|developer) arg="dev-tools"; is_category=true ;;
-    esac
 
     if $is_category; then
         show_curated_servers "$arg"
@@ -606,70 +607,55 @@ show_curated_servers() {
         done <<< "$cat_servers"
     }
 
-    # Category display names and emojis
-    case "$category" in
-        database|db)
-            echo -e "${YELLOW}💾 Database Servers:${NC}"
-            show_category_servers "database"
-            ;;
-        productivity|prod)
-            echo -e "${YELLOW}📝 Productivity Servers:${NC}"
-            show_category_servers "productivity"
-            ;;
-        dev|developer|dev-tools)
-            echo -e "${YELLOW}🛠️  Developer Tools:${NC}"
-            show_category_servers "dev-tools"
-            ;;
-        search)
-            echo -e "${YELLOW}🔍 Search Servers:${NC}"
-            show_category_servers "search"
-            ;;
-        ai)
-            echo -e "${YELLOW}🤖 AI & Official Servers:${NC}"
-            show_category_servers "ai"
-            ;;
-        filesystem)
-            echo -e "${YELLOW}📁 Filesystem Servers:${NC}"
-            show_category_servers "filesystem"
-            ;;
-        *)
-            # Show all categories
+    # Category display helper
+    get_category_emoji() {
+        local cat="$1"
+        case "$cat" in
+            database) echo "💾" ;;
+            search|research) echo "🔍" ;;
+            productivity) echo "📝" ;;
+            dev-tools) echo "🛠️ " ;;
+            ai|official) echo "🤖" ;;
+            filesystem) echo "📁" ;;
+            web|scraping) echo "🌐" ;;
+            notes) echo "📝" ;;
+            communication) echo "💬" ;;
+            design) echo "🎨" ;;
+            demo) echo "🧪" ;;
+            utility) echo "⚙️ " ;;
+            *) echo "📦" ;;
+        esac
+    }
+
+    # If specific category requested, show only that one
+    if [ -n "$category" ]; then
+        # Check if category exists in cache
+        local cat_exists=$(echo "$all_categories" | grep -x "$category")
+
+        if [ -n "$cat_exists" ]; then
+            local emoji=$(get_category_emoji "$category")
+            local cat_title=$(echo "$category" | sed 's/-/ /g' | awk '{for(i=1;i<=NF;i++)sub(/./,toupper(substr($i,1,1)),$i)}1')
+            echo -e "${YELLOW}${emoji} ${cat_title}:${NC}"
+            show_category_servers "$category"
+        else
+            echo -e "${RED}Category '$category' not found${NC}"
+            echo ""
+            echo -e "${BLUE}Available categories:${NC}"
             while IFS= read -r cat; do
-                case "$cat" in
-                    database)
-                        echo -e "${YELLOW}💾 Database:${NC}"
-                        show_category_servers "$cat"
-                        echo ""
-                        ;;
-                    search)
-                        echo -e "${YELLOW}🔍 Search & Research:${NC}"
-                        show_category_servers "$cat"
-                        echo ""
-                        ;;
-                    productivity)
-                        echo -e "${YELLOW}📝 Productivity:${NC}"
-                        show_category_servers "$cat"
-                        echo ""
-                        ;;
-                    dev-tools)
-                        echo -e "${YELLOW}🛠️  Developer Tools:${NC}"
-                        show_category_servers "$cat"
-                        echo ""
-                        ;;
-                    ai)
-                        echo -e "${YELLOW}🤖 AI & Official:${NC}"
-                        show_category_servers "$cat"
-                        echo ""
-                        ;;
-                    filesystem)
-                        echo -e "${YELLOW}📁 Filesystem:${NC}"
-                        show_category_servers "$cat"
-                        echo ""
-                        ;;
-                esac
+                echo "  • $cat"
             done <<< "$all_categories"
-            ;;
-    esac
+            return 1
+        fi
+    else
+        # Show all categories
+        while IFS= read -r cat; do
+            local emoji=$(get_category_emoji "$cat")
+            local cat_title=$(echo "$cat" | sed 's/-/ /g' | awk '{for(i=1;i<=NF;i++)sub(/./,toupper(substr($i,1,1)),$i)}1')
+            echo -e "${YELLOW}${emoji} ${cat_title}:${NC}"
+            show_category_servers "$cat"
+            echo ""
+        done <<< "$all_categories"
+    fi
 
     echo ""
     echo -e "${BLUE}Impact Legend:${NC} ${RED}⬤${NC} Heavy  ${YELLOW}⬤${NC} Medium  ${GREEN}⬤${NC} Light"
