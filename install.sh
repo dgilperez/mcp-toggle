@@ -24,30 +24,24 @@ if [ ! -f package.json ]; then
     npm init -y > /dev/null 2>&1
 fi
 
-echo "📥 Installing/Updating MCP servers..."
+echo "📥 Installing essential MCP servers..."
 echo ""
 
-# Core MCP servers to install
+# Install only essential servers - users can add more with discover/search
 declare -a servers=(
-    "@modelcontextprotocol/server-brave-search"    # Web search
-    "@cyanheads/pubmed-mcp-server"                 # Scientific literature
-    "@modelcontextprotocol/server-github"          # GitHub repos
-    "@modelcontextprotocol/server-filesystem"      # File operations
-    "@notionhq/notion-mcp-server"                  # Notion workspace
-    "@modelcontextprotocol/server-memory"          # Persistent memory
+    "@modelcontextprotocol/server-filesystem"      # File operations (always useful)
     "@modelcontextprotocol/server-fetch"           # Web content fetching
-    "@modelcontextprotocol/server-git"             # Git operations
-    "@modelcontextprotocol/server-puppeteer"       # Browser automation
 )
 
 # Install each server
 for server in "${servers[@]}"; do
     echo "  📦 Installing $server..."
-    npm install "$server" --save || echo "  ⚠️  Could not install $server (may not exist)"
+    npm install "$server" --save || echo "  ⚠️  Could not install $server"
 done
 
 echo ""
-echo "✅ All MCP servers installed/updated"
+echo "✅ Essential servers installed"
+echo "💡 Discover more servers with: ./mcp-toggle.sh discover"
 echo ""
 
 # Generate the global MCP configuration
@@ -56,74 +50,16 @@ echo "⚙️  Generating global MCP configuration..."
 cat > "$MCP_CONFIG" << 'EOF'
 {
   "mcpServers": {
-    "brave-search": {
-      "command": "node",
-      "args": ["$MCP_HOME/servers/node_modules/@modelcontextprotocol/server-brave-search/dist/index.js"],
-      "env": {
-        "BRAVE_API_KEY": "${BRAVE_API_KEY}"
-      }
-    },
-    "pubmed": {
-      "command": "node",
-      "args": ["$MCP_HOME/servers/node_modules/@cyanheads/pubmed-mcp-server/dist/index.js"],
-      "env": {
-        "NCBI_API_KEY": "${PUBMED_API_KEY}",
-        "MCP_TRANSPORT_TYPE": "stdio"
-      }
-    },
-    "github": {
-      "command": "node",
-      "args": ["$MCP_HOME/servers/node_modules/@modelcontextprotocol/server-github/dist/index.js"],
-      "env": {
-        "GITHUB_TOKEN": "${GH_TOKEN}"
-      }
-    },
     "filesystem": {
       "command": "node",
-      "args": ["$MCP_HOME/servers/node_modules/@modelcontextprotocol/server-filesystem/dist/index.js"],
-      "env": {}
-    },
-    "notion": {
-      "command": "node",
-      "args": ["$MCP_HOME/servers/node_modules/@notionhq/notion-mcp-server/dist/index.js"],
-      "env": {
-        "NOTION_TOKEN": "${NOTION_TOKEN}"
-      }
-    },
-    "notion-smithery": {
-      "command": "npx",
-      "args": [
-        "-y",
-        "@smithery/cli@latest",
-        "run",
-        "@smithery/notion",
-        "--key",
-        "${SMITHERY_KEY}",
-        "--profile",
-        "${SMITHERY_PROFILE}"
-      ]
-    },
-    "memory": {
-      "command": "node",
-      "args": ["$MCP_HOME/servers/node_modules/@modelcontextprotocol/server-memory/dist/index.js"],
-      "env": {}
+      "args": ["$MCP_HOME/servers/node_modules/@modelcontextprotocol/server-filesystem/dist/index.js"]
     },
     "fetch": {
       "command": "node",
-      "args": ["$MCP_HOME/servers/node_modules/@modelcontextprotocol/server-fetch/dist/index.js"],
-      "env": {}
-    },
-    "git": {
-      "command": "node",
-      "args": ["$MCP_HOME/servers/node_modules/@modelcontextprotocol/server-git/dist/index.js"],
-      "env": {}
-    },
-    "puppeteer": {
-      "command": "node",
-      "args": ["$MCP_HOME/servers/node_modules/@modelcontextprotocol/server-puppeteer/dist/index.js"],
-      "env": {}
+      "args": ["$MCP_HOME/servers/node_modules/@modelcontextprotocol/server-fetch/dist/index.js"]
     }
-  }
+  },
+  "_disabled_mcpServers": {}
 }
 EOF
 
@@ -164,18 +100,16 @@ if [ ! -L "$HOME/.local/bin/mcp-update" ]; then
 fi
 
 echo ""
-echo "🎉 Global MCP setup complete!"
+echo "🎉 Setup complete!"
 echo ""
-echo "📍 Installation location: $MCP_SERVERS"
-echo "📄 Global config: $MCP_CONFIG"
-echo "🔄 To update servers: mcp-update"
+echo "📍 Installation: $MCP_SERVERS"
+echo "📄 Config: $MCP_CONFIG"
 echo ""
-echo "⚠️  Next steps:"
-echo "1. Run: source ~/.zshrc"
-echo "2. Set API keys in ~/.zshrc:"
-echo "   export BRAVE_API_KEY='your-key'"
-echo "   export PUBMED_API_KEY='your-key'"
-echo "   export GH_TOKEN='your-github-token'"
-echo "   export NOTION_API_KEY='your-notion-key'"
+echo "Next steps:"
+echo "1. Update Claude config: ./update-claude-config.sh"
+echo "2. Sync to other tools: ./sync-all.sh"
+echo "3. Discover more servers: ./mcp-toggle.sh discover"
 echo ""
-echo "3. Update ~/.claude.json to use this config (run update-claude-config.sh)"
+echo "Add more servers:"
+echo "  cd ~/.mcp/servers && npm install @modelcontextprotocol/server-github"
+echo "  Then add to config manually or use mcp-toggle.sh"

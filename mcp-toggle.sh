@@ -762,46 +762,47 @@ show_stats() {
 
 # Show help
 show_help() {
-    cat << EOF
-${BLUE}╔════════════════════════════════════════════════════════════╗
-║           MCP Server Toggle - Quick Reference              ║
-╚════════════════════════════════════════════════════════════╝${NC}
-
-${GREEN}📋 Common Commands${NC}
-  mcp-toggle                      List all servers (default)
-  mcp-toggle ${YELLOW}stats${NC}                  Show visual usage statistics
-  mcp-toggle ${YELLOW}list${NC}                   List enabled/disabled servers
-  mcp-toggle ${YELLOW}enable${NC} <name...>       Enable server(s)
-  mcp-toggle ${YELLOW}disable${NC} <name...>      Disable server(s)
-
-${GREEN}🔍 Information${NC}
-  mcp-toggle ${YELLOW}status${NC} <name>          Check if server is enabled
-  mcp-toggle ${YELLOW}info${NC} <name>            Show server details & token impact
-  mcp-toggle ${YELLOW}health${NC} [name]          Check server dependencies
-
-${GREEN}🌐 Discovery${NC}
-  mcp-toggle ${YELLOW}discover${NC} [category]    Browse popular MCP servers
-  mcp-toggle ${YELLOW}search${NC} <query>         Search npm for MCP servers
-
-${GREEN}⚡ Quick Examples${NC}
-  mcp-toggle disable figma puppeteer   ${BLUE}# Disable multiple servers${NC}
-  mcp-toggle enable github brave       ${BLUE}# Enable multiple servers${NC}
-  mcp-toggle stats                     ${BLUE}# Visual usage analysis${NC}
-  mcp-toggle discover database         ${BLUE}# Browse database servers${NC}
-
-${YELLOW}💡 Pro Tips${NC}
-  • Run without args to see your current setup
-  • Use 'stats' to find heavy context consumers
-  • Disable unused servers to save tokens
-  • Configuration is preserved when disabling
-
-${BLUE}📁 Locations${NC}
-  Config:  ${CLAUDE_CONFIG}
-  Backups: ${BACKUP_DIR}
-
-${BLUE}For detailed help on a command, try:${NC}
-  mcp-toggle <command> --help
-EOF
+    echo -e "${BLUE}MCP Server Toggle Script${NC}"
+    echo ""
+    echo "Enable or disable MCP servers without losing configuration."
+    echo ""
+    echo -e "${GREEN}Usage:${NC}"
+    echo "  $0 enable <server-name...>    Enable disabled server(s)"
+    echo "  $0 disable <server-name...>   Disable enabled server(s)"
+    echo "  $0 status [server-name]       Show status of server(s)"
+    echo "  $0 info <server-name>         Show server details and token impact"
+    echo "  $0 stats                      Show usage statistics and recommendations"
+    echo "  $0 health [server-name]       Check server health and dependencies"
+    echo "  $0 list                       List all servers (enabled and disabled)"
+    echo "  $0 restart [server-name]      Show how to restart MCP servers"
+    echo "  $0 discover [category]        Discover popular MCP servers"
+    echo "  $0 search <query>             Search npm for MCP servers"
+    echo "  $0 help                       Show this help message"
+    echo ""
+    echo -e "${GREEN}Examples:${NC}"
+    echo "  $0 disable figma              Disable Figma MCP server"
+    echo "  $0 enable figma puppeteer     Enable multiple servers at once"
+    echo "  $0 disable github brave       Disable multiple servers at once"
+    echo "  $0 status figma               Check if Figma is enabled or disabled"
+    echo "  $0 info filesystem            Show filesystem server token impact"
+    echo "  $0 stats                      Show statistics and recommendations"
+    echo "  $0 health                     Check all enabled servers"
+    echo "  $0 health filesystem          Check specific server health"
+    echo "  $0 list                       List all servers"
+    echo "  $0 restart                    Show how to restart all MCP servers"
+    echo "  $0 discover                   Show all popular MCP servers"
+    echo "  $0 discover database          Show database MCP servers"
+    echo "  $0 search postgres            Search npm for postgres MCP servers"
+    echo ""
+    echo -e "${YELLOW}Notes:${NC}"
+    echo "  - Configuration is preserved when disabling"
+    echo "  - Backups are created automatically in ~/.mcp/backups/"
+    echo "  - Disabled servers are stored in _disabled_mcpServers"
+    echo ""
+    echo -e "${BLUE}File Locations:${NC}"
+    echo "  Config:  $CLAUDE_CONFIG"
+    echo "  Backups: $BACKUP_DIR"
+    echo ""
 }
 
 # Main command handler
