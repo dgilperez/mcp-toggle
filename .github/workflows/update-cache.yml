@@ -32,6 +32,22 @@ jobs:
           chmod +x scripts/generate-cache.sh
           ./scripts/generate-cache.sh
 
+          echo ""
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "📊 Impact Measurements"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo ""
+          echo "Current cache has been regenerated from registries."
+          echo ""
+          echo "To update with REAL token measurements:"
+          echo "  1. Run locally: ./scripts/measure-impact.sh"
+          echo "  2. Follow prompts to measure via Claude Code /context"
+          echo "  3. Commit: git add data/mcp-cache.json"
+          echo "  4. Push to update measurements for everyone"
+          echo ""
+          echo "Measurements change 'method: manual' → 'method: measured'"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
       - name: Check for changes
         id: check_changes
         run: |
@@ -53,5 +69,65 @@ jobs:
           - Updated npm stats (downloads, versions)
           - Regenerated at: $(date -u +"%Y-%m-%d %H:%M:%S UTC")
 
+          💡 To update impact measurements, run locally:
+             ./scripts/measure-impact.sh
+
           🤖 Automated by GitHub Actions"
           git push
+
+      - name: Create measurement reminder issue
+        if: steps.check_changes.outputs.changes == 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            // Check if reminder issue already exists
+            const issues = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              labels: 'measurement-reminder'
+            });
+
+            if (issues.data.length === 0) {
+              // Create reminder issue
+              await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title: '📊 Weekly Reminder: Update Impact Measurements',
+                labels: ['measurement-reminder', 'enhancement'],
+                body: `## Update Token Impact Measurements
+
+The weekly cache refresh just ran. Consider updating impact measurements with real data from Claude Code.
+
+### How to Measure
+
+Run this locally on your machine (requires Claude Code installed):
+
+\`\`\`bash
+./scripts/measure-impact.sh
+\`\`\`
+
+This will:
+1. Open Claude Code
+2. Guide you through running \`/context\`
+3. Update the cache with real token measurements
+4. Change \`"method": "manual"\` → \`"method": "measured"\`
+
+### Why Measure?
+
+- Current ratings are estimates
+- Real measurements help everyone understand actual impact
+- Measurements vary by usage (filesystem: 100KB vs 10MB file)
+
+### After Measuring
+
+\`\`\`bash
+git add data/mcp-cache.json
+git commit -m "Update impact measurements with real data"
+git push
+\`\`\`
+
+---
+*This issue is auto-created weekly. Close it after updating measurements.*`
+              });
+            }

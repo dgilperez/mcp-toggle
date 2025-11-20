@@ -449,26 +449,23 @@ We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for gene
 
 The MCP server cache (`data/mcp-cache.json`) is automatically updated weekly. To contribute:
 
-1. **Measure impact with your local Claude Code installation**:
+1. **Measure impact with real data**:
    ```bash
-   # Automated: Opens Claude Code and prompts for /context output
-   ./scripts/auto-measure-impact.sh
-
-   # Manual: Run /context in Claude Code, then paste output here
-   ./scripts/update-impact-from-context.sh
+   # Run locally (requires Claude Code installed)
+   ./scripts/measure-impact.sh
    ```
+   This opens Claude Code, guides you through `/context`, and updates the cache with real measurements.
 
 2. **Add descriptions and categories** - Edit `data/manual-metadata.json`
 
-3. **Test locally** - Run `./scripts/generate-cache.sh` to regenerate cache
-
-4. **Submit PR** - See [docs/CONTRIBUTING_CACHE.md](docs/CONTRIBUTING_CACHE.md) for details
+3. **Submit PR** - See [docs/CONTRIBUTING_CACHE.md](docs/CONTRIBUTING_CACHE.md) for details
 
 **How measurement works:**
 - Uses Claude Code's `/context` command to get **real token usage**
 - Measures actual MCP server overhead, not estimates
 - Updates cache with accurate baseline measurements
 - Impact categories: Heavy (1000+ tokens), Medium (100-1000), Light (<100)
+- Weekly workflow creates reminder issues to measure
 
 The cache system:
 - Pulls from MCP official registry + npm stats

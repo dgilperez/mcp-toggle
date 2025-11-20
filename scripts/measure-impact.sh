@@ -1,6 +1,13 @@
 #!/bin/bash
-# Measure MCP Server Token Impact
-# Estimates context window usage by measuring tool definitions and sample responses
+# Measure and update MCP server impact ratings from Claude Code
+#
+# This script helps you measure REAL token usage from your local Claude Code
+# installation and updates the cache with accurate measurements.
+#
+# Usage:
+#   ./scripts/measure-impact.sh
+#
+# The script will guide you through the process.
 
 set -e
 
@@ -8,89 +15,145 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 CACHE_FILE="$PROJECT_ROOT/data/mcp-cache.json"
 
-# Approximate token counter (rough estimate: ~4 chars per token)
-estimate_tokens() {
-    local text="$1"
-    local char_count=$(echo -n "$text" | wc -c | tr -d ' ')
-    echo $(( char_count / 4 ))
-}
-
-# Start MCP server and get tool list
-get_tool_definitions() {
-    local server_name="$1"
-    local command="$2"
-    shift 2
-    local args=("$@")
-
-    echo "Measuring $server_name..." >&2
-
-    # Start server and send initialize request
-    # This is a simplified version - would need full MCP protocol implementation
-    timeout 5 "$command" "${args[@]}" <<EOF 2>/dev/null || true
-{"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {"protocolVersion": "0.1.0", "capabilities": {}}}
-{"jsonrpc": "2.0", "id": 2, "method": "tools/list", "params": {}}
-EOF
-}
-
+echo "================================================"
 echo "MCP Server Impact Measurement Tool"
-echo "===================================="
+echo "================================================"
 echo ""
-echo "This tool provides BASELINE estimates by measuring:"
-echo "  1. Tool definition sizes (always loaded)"
-echo "  2. Approximate token counts (char_count / 4)"
+echo "This tool updates data/mcp-cache.json with REAL token"
+echo "measurements from your Claude Code installation."
 echo ""
-echo "⚠️  LIMITATIONS:"
-echo "  - Actual usage varies by operation"
-echo "  - filesystem: small file vs large file = 100x difference"
-echo "  - search: 1 result vs 20 results = 20x difference"
-echo "  - This measures BASELINE only, not actual usage"
+echo "📊 Why measure? Current ratings are estimates. Real"
+echo "   measurements help everyone understand actual impact."
 echo ""
-echo "For accurate measurements, use Claude Code's /context command"
+echo "🎯 This runs LOCALLY - you need Claude Code installed."
 echo ""
 
-# Example measurements for installed servers
-if [ -f "$HOME/.claude.json" ]; then
-    echo "Analyzing servers from ~/.claude.json..."
+# Check if Claude Code is installed
+if ! command -v claude &> /dev/null; then
+    echo "❌ Error: Claude Code not found"
     echo ""
+    echo "Install Claude Code first, then run this script."
+    exit 1
+fi
 
-    # Get list of enabled servers
-    servers=$(jq -r '.mcpServers | keys[]' "$HOME/.claude.json" 2>/dev/null)
+echo "✓ Claude Code found"
+echo ""
+echo "STEPS:"
+echo "------"
+echo "1. I'll open Claude Code in a new terminal"
+echo "2. You run: /context"
+echo "3. Copy the MCP server lines (showing token counts)"
+echo "4. Paste them here"
+echo "5. I'll update the cache with real measurements"
+echo ""
+echo -n "Ready? Press Enter to start..."
+read
 
-    while IFS= read -r server; do
-        if [ -n "$server" ]; then
-            # Get command and args
-            command=$(jq -r ".mcpServers.\"$server\".command" "$HOME/.claude.json")
+echo ""
 
-            echo "Server: $server"
-            echo "  Command: $command"
-            echo "  Method: Would need to start server and query tool list"
-            echo "  Recommendation: Use /context in Claude Code for accurate measurement"
-            echo ""
-        fi
-    done <<< "$servers"
+# Open Claude Code in new terminal (macOS)
+if [[ "$OSTYPE" == "darwin"* ]]; then
+    osascript <<EOF 2>/dev/null
+tell application "Terminal"
+    do script "echo '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━' && echo 'MCP Impact Measurement - Claude Code' && echo '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━' && echo '' && echo '1. Run this command: /context' && echo '2. Copy the MCP server lines (with token counts)' && echo '3. Paste in the other terminal' && echo '' && claude"
+    activate
+end tell
+EOF
+    echo "✓ Opened Claude Code in new terminal"
+else
+    echo "ℹ️  Please open another terminal and run: claude"
 fi
 
 echo ""
-echo "PROPOSED APPROACH:"
-echo "=================="
+echo "Now in Claude Code terminal:"
+echo "  1. Type: /context"
+echo "  2. Copy lines like: 'filesystem: 1,450 tokens'"
 echo ""
-echo "1. Manual measurement (CURRENT):"
-echo "   - Use /context command in Claude Code"
-echo "   - Observe actual token usage"
-echo "   - Update data/manual-metadata.json"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "Paste /context output below (Ctrl+D when done):"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo ""
-echo "2. Semi-automated (POSSIBLE):"
-echo "   - Script starts each MCP server"
-echo "   - Queries tool list via MCP protocol"
-echo "   - Measures JSON response size"
-echo "   - Estimates tokens (chars / 4)"
-echo "   - Makes sample requests where possible"
-echo "   - Outputs to data/automated-measurements.json"
+
+# Read multiline input until EOF
+context_output=$(cat)
+
+if [ -z "$context_output" ]; then
+    echo "Error: No input received"
+    exit 1
+fi
+
 echo ""
-echo "3. Fully automated (IDEAL):"
-echo "   - Integrate with Claude API"
-echo "   - Make actual requests with each MCP server"
-echo "   - Measure real token usage via API"
-echo "   - Would need Claude API key + automation"
+echo "Parsing measurements..."
 echo ""
-echo "Which approach would you prefer?"
+
+# Parse the output and update cache
+temp_updates=$(mktemp)
+
+# Extract server: token_count pairs
+echo "$context_output" | grep -E "^\s*[a-z0-9_-]+:\s*[0-9,]+\s*tokens?" | while IFS= read -r line; do
+    # Extract server name and token count
+    server=$(echo "$line" | sed -E 's/^\s*([a-z0-9_-]+):.*/\1/')
+    tokens=$(echo "$line" | sed -E 's/.*:\s*([0-9,]+).*/\1/' | tr -d ',')
+
+    if [ -n "$server" ] && [ -n "$tokens" ]; then
+        # Determine category based on token count
+        if [ "$tokens" -ge 1000 ]; then
+            category="Heavy"
+        elif [ "$tokens" -ge 100 ]; then
+            category="Medium"
+        else
+            category="Light"
+        fi
+
+        echo "  • $server: $tokens tokens ($category)"
+        echo "$server|$tokens|$category" >> "$temp_updates"
+    fi
+done
+
+if [ ! -s "$temp_updates" ]; then
+    echo "Error: No valid measurements found in input"
+    echo "Please paste the MCP server section from /context output"
+    rm "$temp_updates"
+    exit 1
+fi
+
+echo ""
+echo "Updating $CACHE_FILE..."
+
+# Backup cache
+cp "$CACHE_FILE" "$CACHE_FILE.backup"
+
+# Update cache with measurements
+while IFS='|' read -r server tokens category; do
+    # Check if server exists in cache
+    if jq -e ".servers.\"$server\"" "$CACHE_FILE" >/dev/null 2>&1; then
+        # Update existing server
+        jq --arg s "$server" \
+           --argjson t "$tokens" \
+           --arg c "$category" \
+           --arg date "$(date -u +"%Y-%m-%d")" \
+           '.servers[$s].impact.estimated_tokens = $t |
+            .servers[$s].impact.category = $c |
+            .servers[$s].impact.method = "measured" |
+            .servers[$s].impact.measured_at = $date' \
+           "$CACHE_FILE" > "$CACHE_FILE.tmp"
+        mv "$CACHE_FILE.tmp" "$CACHE_FILE"
+        echo "  ✓ Updated $server"
+    else
+        echo "  ⚠ Skipped $server (not in cache)"
+    fi
+done < "$temp_updates"
+
+rm "$temp_updates"
+
+echo ""
+echo "✓ Cache updated successfully!"
+echo ""
+echo "Backup saved to: $CACHE_FILE.backup"
+echo ""
+echo "Next steps:"
+echo "  1. Review changes: git diff data/mcp-cache.json"
+echo "  2. Commit: git add data/mcp-cache.json"
+echo "  3. Commit: git commit -m 'Update impact ratings with real measurements'"
+echo "  4. Push: git push"
+echo ""
