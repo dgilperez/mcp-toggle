@@ -79,17 +79,20 @@ test_required_commands() {
 test_no_hardcoded_paths() {
     test_header "No hardcoded personal paths"
 
-    # Allow GitHub URLs but not other hardcoded paths
-    if ! grep -r "dgilperez" "$PROJECT_ROOT" --exclude-dir=.git --exclude-dir=tests 2>/dev/null | grep -v "github.com" >/dev/null 2>&1; then
-        pass "No hardcoded username (GitHub URLs allowed)"
+    # Check for hardcoded absolute paths like /Users/username (macOS) or /home/username (Linux)
+    # Allow $HOME, ~/, and relative paths
+    if grep -rE "/(Users|home)/[^/\"'\$]+" "$PROJECT_ROOT" --exclude-dir=.git --exclude-dir=tests --exclude-dir=node_modules 2>/dev/null | grep -v "github.com" | grep -v "# " >/dev/null 2>&1; then
+        fail "Found hardcoded absolute paths"
+        grep -rE "/(Users|home)/[^/\"'\$]+" "$PROJECT_ROOT" --exclude-dir=.git --exclude-dir=tests --exclude-dir=node_modules 2>/dev/null | grep -v "github.com" | head -3
     else
-        fail "Found hardcoded username 'dgilperez'"
+        pass "No hardcoded absolute paths"
     fi
 
-    if ! grep -r "/Users/dgilperez" "$PROJECT_ROOT" --exclude-dir=.git --exclude-dir=tests >/dev/null 2>&1; then
-        pass "No hardcoded paths to /Users/dgilperez"
+    # Check specifically for paths starting with /Users/ or /home/ in scripts
+    if grep -r "\"/Users/" "$PROJECT_ROOT" --exclude-dir=.git --exclude-dir=tests --exclude-dir=node_modules 2>/dev/null | grep -v "github.com" >/dev/null 2>&1; then
+        fail "Found hardcoded /Users/ paths"
     else
-        fail "Found hardcoded path /Users/dgilperez"
+        pass "No hardcoded /Users/ paths"
     fi
 }
 
