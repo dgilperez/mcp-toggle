@@ -1,0 +1,299 @@
+{
+  "_meta": {
+    "generated_at": "2025-11-20T10:20:12Z",
+    "version": "1.0.0",
+    "sources": {
+      "mcp_registry": "https://registry.modelcontextprotocol.io/v0/servers",
+      "npm_registry": "https://registry.npmjs.org",
+      "manual_overrides": true
+    }
+  },
+  "servers": {
+    "filesystem": {
+      "package": "@modelcontextprotocol/server-filesystem",
+      "description": "Reads/writes files; returns full file contents in context",
+      "impact": {
+        "estimated_tokens": 1500,
+        "category": "Heavy",
+        "method": "manual",
+        "measured_at": "2025-01-19"
+      },
+      "categories": [
+        "filesystem",
+        "dev-tools"
+      ]
+    },
+    "brave-search": {
+      "package": "@modelcontextprotocol/server-brave-search",
+      "description": "Returns search results; compact responses",
+      "impact": {
+        "estimated_tokens": 50,
+        "category": "Light",
+        "method": "manual",
+        "measured_at": "2025-01-19"
+      },
+      "categories": [
+        "search",
+        "web"
+      ]
+    },
+    "github": {
+      "package": "@modelcontextprotocol/server-github",
+      "description": "Fetches repos, issues, PRs; moderate API responses",
+      "impact": {
+        "estimated_tokens": 500,
+        "category": "Medium",
+        "method": "manual",
+        "measured_at": "2025-01-19"
+      },
+      "categories": [
+        "dev-tools",
+        "productivity"
+      ]
+    },
+    "pubmed": {
+      "package": "@cyanheads/pubmed-mcp-server",
+      "description": "Scientific papers; abstract-heavy responses",
+      "impact": {
+        "estimated_tokens": 600,
+        "category": "Medium",
+        "method": "manual",
+        "measured_at": "2025-01-19"
+      },
+      "categories": [
+        "search",
+        "research"
+      ]
+    },
+    "figma": {
+      "package": "figma-developer-mcp",
+      "description": "Design files; large JSON responses with layer data",
+      "impact": {
+        "estimated_tokens": 2000,
+        "category": "Heavy",
+        "method": "manual",
+        "measured_at": "2025-01-19"
+      },
+      "categories": [
+        "design",
+        "productivity"
+      ]
+    },
+    "puppeteer": {
+      "package": "@modelcontextprotocol/server-puppeteer",
+      "description": "Full webpage scraping; returns complete HTML/DOM",
+      "impact": {
+        "estimated_tokens": 1800,
+        "category": "Heavy",
+        "method": "manual",
+        "measured_at": "2025-01-19"
+      },
+      "categories": [
+        "web",
+        "scraping"
+      ]
+    },
+    "postgres": {
+      "package": "mcp-postgres-server",
+      "description": "Database queries; result set size varies",
+      "impact": {
+        "estimated_tokens": 400,
+        "category": "Medium",
+        "method": "manual",
+        "measured_at": "2025-01-19"
+      },
+      "categories": [
+        "database"
+      ]
+    },
+    "sqlite": {
+      "package": "@modelcontextprotocol/server-sqlite",
+      "description": "Database queries; result set size varies",
+      "impact": {
+        "estimated_tokens": 350,
+        "category": "Medium",
+        "method": "manual",
+        "measured_at": "2025-01-19"
+      },
+      "categories": [
+        "database"
+      ]
+    },
+    "notion": {
+      "package": "@notionhq/notion-mcp-server",
+      "description": "Notion pages; moderate content per page",
+      "impact": {
+        "estimated_tokens": 450,
+        "category": "Medium",
+        "method": "manual",
+        "measured_at": "2025-01-19"
+      },
+      "categories": [
+        "productivity",
+        "notes"
+      ]
+    },
+    "slack": {
+      "package": "@modelcontextprotocol/server-slack",
+      "description": "Messages and channels; compact responses",
+      "impact": {
+        "estimated_tokens": 80,
+        "category": "Light",
+        "method": "manual",
+        "measured_at": "2025-01-19"
+      },
+      "categories": [
+        "productivity",
+        "communication"
+      ]
+    },
+    "obsidian": {
+      "package": "@mauricio.wolff/mcp-obsidian",
+      "description": "Note contents; returns full markdown files",
+      "impact": {
+        "estimated_tokens": 1400,
+        "category": "Heavy",
+        "method": "manual",
+        "measured_at": "2025-01-19"
+      },
+      "categories": [
+        "notes",
+        "productivity"
+      ]
+    },
+    "memory": {
+      "package": "@modelcontextprotocol/server-memory",
+      "description": "Official MCP server; minimal token usage",
+      "impact": {
+        "estimated_tokens": 30,
+        "category": "Light",
+        "method": "manual",
+        "measured_at": "2025-01-19"
+      },
+      "categories": [
+        "ai",
+        "official"
+      ]
+    },
+    "sequential-thinking": {
+      "package": "@modelcontextprotocol/server-sequential-thinking",
+      "description": "Official MCP server; minimal token usage",
+      "impact": {
+        "estimated_tokens": 40,
+        "category": "Light",
+        "method": "manual",
+        "measured_at": "2025-01-19"
+      },
+      "categories": [
+        "ai",
+        "official"
+      ]
+    },
+    "time": {
+      "package": "@modelcontextprotocol/server-time",
+      "description": "Official MCP server; minimal token usage",
+      "impact": {
+        "estimated_tokens": 20,
+        "category": "Light",
+        "method": "manual",
+        "measured_at": "2025-01-19"
+      },
+      "categories": [
+        "utility",
+        "official"
+      ]
+    },
+    "everything": {
+      "package": "@modelcontextprotocol/server-everything",
+      "description": "Official MCP demo server",
+      "impact": {
+        "estimated_tokens": 100,
+        "category": "Light",
+        "method": "manual",
+        "measured_at": "2025-01-19"
+      },
+      "categories": [
+        "demo",
+        "official"
+      ]
+    },
+    "fetch": {
+      "package": "@modelcontextprotocol/server-fetch",
+      "description": "Web content fetching; size varies by target",
+      "impact": {
+        "estimated_tokens": 300,
+        "category": "Medium",
+        "method": "manual",
+        "measured_at": "2025-01-19"
+      },
+      "categories": [
+        "web",
+        "utility"
+      ]
+    }
+  },
+  "categories": {
+    "filesystem": [
+      "filesystem"
+    ],
+    "dev-tools": [
+      "filesystem",
+      "github"
+    ],
+    "search": [
+      "brave-search",
+      "pubmed"
+    ],
+    "web": [
+      "brave-search",
+      "fetch",
+      "puppeteer"
+    ],
+    "productivity": [
+      "figma",
+      "github",
+      "notion",
+      "obsidian",
+      "slack"
+    ],
+    "research": [
+      "pubmed"
+    ],
+    "design": [
+      "figma"
+    ],
+    "scraping": [
+      "puppeteer"
+    ],
+    "database": [
+      "postgres",
+      "sqlite"
+    ],
+    "notes": [
+      "notion",
+      "obsidian"
+    ],
+    "communication": [
+      "slack"
+    ],
+    "ai": [
+      "memory",
+      "sequential-thinking"
+    ],
+    "official": [
+      "everything",
+      "memory",
+      "sequential-thinking",
+      "time"
+    ],
+    "utility": [
+      "fetch",
+      "time"
+    ],
+    "demo": [
+      "everything"
+    ]
+  },
+  "_comment": "Manual metadata for MCP servers - contribute via PR!",
+  "_instructions": "Add impact ratings, better descriptions, and categories here"
+}

@@ -1,0 +1,57 @@
+name: Update MCP Cache
+
+on:
+  # Run weekly on Sunday nights at 23:00 CET (22:00 UTC in winter, 21:00 UTC in summer)
+  schedule:
+    - cron: '0 22 * * 0'  # 22:00 UTC on Sundays
+
+  # Allow manual triggering
+  workflow_dispatch:
+
+jobs:
+  update-cache:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install jq
+        run: sudo apt-get update && sudo apt-get install -y jq
+
+      - name: Run cache generation
+        run: |
+          chmod +x scripts/generate-cache.sh
+          ./scripts/generate-cache.sh
+
+      - name: Check for changes
+        id: check_changes
+        run: |
+          if git diff --quiet data/mcp-cache.json; then
+            echo "changes=false" >> $GITHUB_OUTPUT
+          else
+            echo "changes=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Commit and push changes
+        if: steps.check_changes.outputs.changes == 'true'
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          git add data/mcp-cache.json
+          git commit -m "chore: Update MCP cache (weekly automated update)
+
+          - Refreshed server metadata from MCP registry
+          - Updated npm stats (downloads, versions)
+          - Regenerated at: $(date -u +"%Y-%m-%d %H:%M:%S UTC")
+
+          🤖 Automated by GitHub Actions"
+          git push

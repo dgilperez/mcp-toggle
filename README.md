@@ -75,7 +75,7 @@ Enable and disable MCP servers without losing their configuration:
 ```bash
 # List all servers and their status (or just run without args)
 ./mcp-toggle.sh
-./mcp-toggle.sh list
+./mcp-toggle.sh info
 
 # Disable a server (moves to _disabled_mcpServers)
 ./mcp-toggle.sh disable figma
@@ -86,55 +86,55 @@ Enable and disable MCP servers without losing their configuration:
 # Bulk operations - enable/disable multiple servers at once
 ./mcp-toggle.sh enable figma puppeteer notion
 ./mcp-toggle.sh disable github brave-search
-
-# Check server status
-./mcp-toggle.sh status figma
 ```
 
 Disabled servers are kept in `_disabled_mcpServers` section - they're not loaded but configuration is preserved.
 
-### 2. Discover New Servers
+### 2. Server Information & Health
 
-Browse and discover popular MCP servers:
-
-```bash
-# Show curated list of popular servers
-./mcp-toggle.sh discover
-
-# Search by category
-./mcp-toggle.sh discover database      # Database-related servers
-./mcp-toggle.sh discover productivity  # Productivity tools
-./mcp-toggle.sh discover dev-tools     # Development tools
-
-# Search npm for MCP servers
-./mcp-toggle.sh discover --search "weather"
-```
-
-The discover feature includes 50+ curated MCP servers organized by category:
-- **Database**: PostgreSQL, Supabase, MongoDB, etc.
-- **Productivity**: Notion, Obsidian, Google Drive, etc.
-- **Development**: GitHub, GitLab, Docker, etc.
-- **Data & Analytics**: Pandas, Puppeteer, etc.
-- **Search**: Brave, Exa, Google Search, etc.
-- **AI & ML**: Ollama, Perplexity, etc.
-
-### 3. Context Window Management
-
-Check token impact of MCP servers to manage your context window effectively:
+View comprehensive server info including status, token impact, and health checks:
 
 ```bash
-# See detailed info including token impact
+# See detailed info including status, impact, configuration, health
 ./mcp-toggle.sh info filesystem
-# Shows: Heavy impact - consider disabling when not needed
 
-./mcp-toggle.sh info brave-search
-# Shows: Light impact - safe to keep enabled
+# Shows:
+# - Status: ENABLED/DISABLED
+# - Context Window Impact: Heavy/Medium/Light
+# - Configuration details
+# - Health Check: command availability, environment variables
+# - Impact guidance
 ```
 
 Impact levels:
 - **Heavy**: 1000+ tokens (filesystem, figma, puppeteer, obsidian)
 - **Medium**: 100-1000 tokens (github, databases, notion)
 - **Light**: <100 tokens (search, slack, official servers)
+
+### 3. Discover Servers
+
+Browse curated servers or search npm - all in one command:
+
+```bash
+# Show curated list of popular servers
+./mcp-toggle.sh discover
+
+# Browse by category
+./mcp-toggle.sh discover database      # Database-related servers
+./mcp-toggle.sh discover productivity  # Productivity tools
+./mcp-toggle.sh discover dev-tools     # Development tools
+
+# Search npm for anything else
+./mcp-toggle.sh discover weather       # Searches npm if not a known category
+```
+
+The discover feature includes 15+ curated categories with impact indicators:
+- **Database**: PostgreSQL, SQLite
+- **Productivity**: Notion, Obsidian, Slack
+- **Development**: GitHub, Puppeteer
+- **Search**: Brave, PubMed
+- **AI & Official**: Memory, Sequential-thinking
+- And more categories dynamically from the cache
 
 ### 4. Usage Analytics
 
@@ -172,25 +172,7 @@ Each editor receives a properly formatted configuration with:
 - Editor-specific paths and formats
 - Automatic server discovery
 
-### 6. Health Checks
-
-Verify your MCP servers are properly configured and healthy:
-
-```bash
-# Check all enabled servers
-./mcp-toggle.sh health
-
-# Check specific server
-./mcp-toggle.sh health filesystem
-```
-
-This checks:
-- Command availability (node, python, npx, etc.)
-- Required environment variables are set
-- Server configuration is valid
-- Provides actionable recommendations for issues found
-
-### 7. Automatic Updates
+### 6. Automatic Updates
 
 MCP servers are automatically updated every Monday when you start a new terminal (Oh My Zsh style):
 
@@ -373,9 +355,9 @@ ls ~/.mcp/servers/node_modules/ | grep your-server
 cat ~/.mcp/global-config.json | jq '.mcpServers | keys'
 ```
 
-3. Check if it's disabled:
+3. Check server info:
 ```bash
-./mcp-toggle.sh status your-server
+./mcp-toggle.sh info your-server
 ```
 
 4. Restart your editor if needed
@@ -452,13 +434,22 @@ export BRAVE_API_KEY=$BRAVE_API_KEY_PROD
 
 ## Contributing
 
-We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for general guidelines.
 
-To add new MCP servers to the curated discovery list:
-1. Test the server manually first
-2. Add to the discovery list in `mcp-toggle.sh`
-3. Document required API keys
-4. Submit PR with example usage
+### Contributing Server Metadata
+
+The MCP server cache (`data/mcp-cache.json`) is automatically updated weekly. To contribute:
+
+1. **Add impact ratings and descriptions** - Edit `data/manual-metadata.json`
+2. **Measure with Claude Code** - Use `/context` command to see actual token usage
+3. **Test locally** - Run `./scripts/generate-cache.sh` to regenerate cache
+4. **Submit PR** - See [docs/CONTRIBUTING_CACHE.md](docs/CONTRIBUTING_CACHE.md) for details
+
+The cache system:
+- Pulls from MCP official registry + npm stats
+- Merges with manual metadata (PRs welcome!)
+- Regenerates automatically every Sunday night
+- Supports local overrides in `~/.mcp/local-metadata.json`
 
 ## Security Notes
 
@@ -473,6 +464,7 @@ To add new MCP servers to the curated discovery list:
 
 - [Troubleshooting Guide](docs/TROUBLESHOOTING.md) - Common issues and solutions
 - [Contributing Guidelines](CONTRIBUTING.md) - How to contribute
+- [Cache Contributions](docs/CONTRIBUTING_CACHE.md) - Add server metadata and impact ratings
 - [Changelog](CHANGELOG.md) - Version history and changes
 
 ## Resources

@@ -12,6 +12,11 @@
 
 set -e
 
+# Detect script directory
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+MCP_CACHE="$SCRIPT_DIR/data/mcp-cache.json"
+LOCAL_OVERRIDE="$HOME/.mcp/local-metadata.json"
+
 # Parse --config flag for testing
 CLAUDE_CONFIG="$HOME/.claude.json"
 if [ "${1:-}" = "--config" ]; then
@@ -71,57 +76,47 @@ list_servers() {
 # Get server metadata (impact and description)
 get_server_metadata() {
     local server_name="$1"
+    local impact="Unknown"
+    local description="Impact not assessed; check server documentation"
 
-    # Define metadata: server|||impact|||description
-    # Impact: Heavy (1000+ tokens), Medium (100-1000), Light (<100)
-    case "$server_name" in
-        filesystem)
-            echo "Heavy|||Reads/writes files; returns full file contents in context"
-            ;;
-        github)
-            echo "Medium|||Fetches repos, issues, PRs; moderate API responses"
-            ;;
-        brave-search|brave)
-            echo "Light|||Returns search results; compact responses"
-            ;;
-        pubmed)
-            echo "Medium|||Scientific papers; abstract-heavy responses"
-            ;;
-        figma)
-            echo "Heavy|||Design files; large JSON responses with layer data"
-            ;;
-        puppeteer)
-            echo "Heavy|||Full webpage scraping; returns complete HTML/DOM"
-            ;;
-        postgres|sqlite)
-            echo "Medium|||Database queries; result set size varies"
-            ;;
-        notion)
-            echo "Medium|||Notion pages; moderate content per page"
-            ;;
-        slack)
-            echo "Light|||Messages and channels; compact responses"
-            ;;
-        obsidian)
-            echo "Heavy|||Note contents; returns full markdown files"
-            ;;
-        memory|sequential-thinking|time|everything)
-            echo "Light|||Official MCP servers; minimal token usage"
-            ;;
-        *)
-            echo "Unknown|||Impact not assessed; check server documentation"
-            ;;
-    esac
+    # Try local override first (allows users to extend/override)
+    if [ -f "$LOCAL_OVERRIDE" ]; then
+        local override_data=$(jq -r --arg s "$server_name" \
+            '.servers[$s] // empty' "$LOCAL_OVERRIDE" 2>/dev/null)
+
+        if [ -n "$override_data" ]; then
+            impact=$(echo "$override_data" | jq -r '.impact.category // "Unknown"')
+            description=$(echo "$override_data" | jq -r '.description // "No description"')
+            echo "${impact}|||${description}"
+            return
+        fi
+    fi
+
+    # Fall back to cache
+    if [ -f "$MCP_CACHE" ]; then
+        local cache_data=$(jq -r --arg s "$server_name" \
+            '.servers[$s] // empty' "$MCP_CACHE" 2>/dev/null)
+
+        if [ -n "$cache_data" ]; then
+            impact=$(echo "$cache_data" | jq -r '.impact.category // "Unknown"')
+            description=$(echo "$cache_data" | jq -r '.description // "No description"')
+            echo "${impact}|||${description}"
+            return
+        fi
+    fi
+
+    # Default fallback
+    echo "${impact}|||${description}"
 }
 
-# Show detailed server info
+# Show server info (comprehensive: status + impact + config + health)
 show_server_info() {
     local server_name="$1"
 
+    # If no server specified, list all servers
     if [ -z "$server_name" ]; then
-        echo -e "${RED}Error: Server name required${NC}"
-        echo "Usage: $0 info <server-name>"
-        exit 1
+        list_servers
+        return
     fi
 
     echo -e "${BLUE}=== Server Information: $server_name ===${NC}\n"
@@ -168,6 +163,51 @@ show_server_info() {
     jq -r ".$config_section.\"$server_name\"" "$CLAUDE_CONFIG" | sed 's/^/  /'
     echo ""
 
+    # Health check (only for enabled servers)
+    if [ "$status" = "ENABLED" ]; then
+        echo -e "${BLUE}Health Check:${NC}"
+
+        local server_issues=0
+        local command=$(jq -r ".mcpServers.\"$server_name\".command" "$CLAUDE_CONFIG" 2>/dev/null)
+
+        # Check command availability
+        if [ -n "$command" ] && [ "$command" != "null" ]; then
+            if command -v "$command" &>/dev/null; then
+                echo -e "  ${GREEN}✓${NC} Command '$command' is available"
+            else
+                echo -e "  ${RED}✗${NC} Command '$command' NOT FOUND"
+                ((server_issues++))
+            fi
+        fi
+
+        # Check environment variables
+        local env_check_failed=false
+        while IFS= read -r env_value; do
+            if [ -n "$env_value" ] && [ "$env_value" != "null" ]; then
+                # Extract variable name from ${VAR_NAME} format
+                local var_name=$(echo "$env_value" | sed 's/\${//;s/}//')
+
+                if [ -n "${!var_name:-}" ]; then
+                    echo -e "  ${GREEN}✓${NC} Environment variable $var_name is set"
+                else
+                    echo -e "  ${RED}✗${NC} Environment variable $var_name NOT SET"
+                    ((server_issues++))
+                    env_check_failed=true
+                fi
+            fi
+        done < <(jq -r ".mcpServers.\"$server_name\".env // {} | to_entries[] | .value" "$CLAUDE_CONFIG" 2>/dev/null)
+
+        if [ $server_issues -eq 0 ]; then
+            echo -e "  ${GREEN}All health checks passed${NC}"
+        else
+            echo -e "  ${YELLOW}⚠ Found $server_issues issue(s)${NC}"
+            if $env_check_failed; then
+                echo -e "  ${BLUE}Tip:${NC} Add missing env vars to ~/.zshrc and run: source ~/.zshrc"
+            fi
+        fi
+        echo ""
+    fi
+
     # Impact guidance
     case "$impact" in
         Heavy)
@@ -183,31 +223,6 @@ show_server_info() {
             echo "  Safe to keep enabled"
             ;;
     esac
-}
-
-# Get server status
-get_status() {
-    local server_name="$1"
-
-    if [ -z "$server_name" ]; then
-        list_servers
-        return
-    fi
-
-    # Check if enabled
-    if jq -e ".mcpServers.\"$server_name\"" "$CLAUDE_CONFIG" &>/dev/null; then
-        echo -e "${GREEN}✓ $server_name is ENABLED${NC}"
-        return 0
-    fi
-
-    # Check if disabled
-    if jq -e "._disabled_mcpServers.\"$server_name\"" "$CLAUDE_CONFIG" &>/dev/null; then
-        echo -e "${YELLOW}✗ $server_name is DISABLED${NC}"
-        return 0
-    fi
-
-    echo -e "${RED}✗ $server_name not found${NC}"
-    return 1
 }
 
 # Enable server(s) - supports bulk operations
@@ -356,17 +371,41 @@ restart_mcp() {
     echo ""
 }
 
-# Search for MCP servers
-search_servers() {
-    local query="$1"
-    local category="$2"
+# Discover MCP servers (curated list or npm search)
+discover_servers() {
+    local arg="$1"
 
     echo -e "${BLUE}=== MCP Server Discovery ===${NC}\n"
 
-    if [ -z "$query" ]; then
-        show_curated_servers "$category"
+    # If no argument, show all curated
+    if [ -z "$arg" ]; then
+        show_curated_servers ""
+        return
+    fi
+
+    # Check if it's a known category
+    local all_categories=$(jq -r '.categories | keys[]' "$MCP_CACHE" 2>/dev/null)
+    local is_category=false
+
+    while IFS= read -r cat; do
+        if [[ "$arg" == "$cat" ]] || [[ "$arg" == "${cat%-*}" ]]; then
+            is_category=true
+            break
+        fi
+    done <<< "$all_categories"
+
+    # Category aliases
+    case "$arg" in
+        db) arg="database"; is_category=true ;;
+        prod) arg="productivity"; is_category=true ;;
+        dev|developer) arg="dev-tools"; is_category=true ;;
+    esac
+
+    if $is_category; then
+        show_curated_servers "$arg"
     else
-        search_npm "$query"
+        # Not a category, search npm
+        search_npm "$arg"
     fi
 }
 
@@ -376,136 +415,134 @@ show_curated_servers() {
 
     echo -e "${GREEN}Popular MCP Servers:${NC}\n"
 
-    # Define curated servers (name|||package|||description)
-    local official=(
-        "memory|||@modelcontextprotocol/server-memory|||Knowledge graph persistent memory"
-        "sequential-thinking|||@modelcontextprotocol/server-sequential-thinking|||Dynamic problem-solving"
-        "time|||@modelcontextprotocol/server-time|||Time and timezone conversion"
-        "everything|||@modelcontextprotocol/server-everything|||Full MCP demo server"
-    )
+    # Check if cache exists
+    if [ ! -f "$MCP_CACHE" ]; then
+        echo -e "${RED}Error: MCP cache not found at $MCP_CACHE${NC}"
+        echo "Run: $SCRIPT_DIR/scripts/generate-cache.sh"
+        return 1
+    fi
 
-    local database=(
-        "postgres|||mcp-postgres-server|||PostgreSQL database operations"
-        "sqlite|||@modelcontextprotocol/server-sqlite|||SQLite database access"
-    )
+    # Read category mappings from cache
+    local all_categories=$(jq -r '.categories | keys[]' "$MCP_CACHE" 2>/dev/null)
 
-    local productivity=(
-        "google-drive|||@modelcontextprotocol/server-gdrive|||Google Drive integration"
-        "slack|||@modelcontextprotocol/server-slack|||Slack workspace access"
-        "obsidian|||@mauricio.wolff/mcp-obsidian|||Obsidian vault operations"
-        "notion|||@notionhq/notion-mcp-server|||Notion workspace integration"
-    )
+    # Helper to show servers in a category
+    show_category_servers() {
+        local cat_name="$1"
+        local cat_servers=$(jq -r --arg cat "$cat_name" '.categories[$cat] // [] | .[]' "$MCP_CACHE" 2>/dev/null)
 
-    local developer=(
-        "sentry|||@sentry/mcp-server|||Error tracking and monitoring"
-        "puppeteer|||@modelcontextprotocol/server-puppeteer|||Browser automation"
-        "github|||installed|||GitHub operations"
-        "filesystem|||installed|||File operations"
-    )
+        if [ -z "$cat_servers" ]; then
+            return
+        fi
 
-    local search=(
-        "brave-search|||@modelcontextprotocol/server-brave-search|||Privacy-focused web search"
-        "pubmed|||@cyanheads/pubmed-mcp-server|||Scientific literature search"
-    )
+        while IFS= read -r server_name; do
+            if [ -n "$server_name" ]; then
+                local server_data=$(jq -r --arg s "$server_name" '.servers[$s] // empty' "$MCP_CACHE" 2>/dev/null)
 
-    local design=(
-        "figma|||figma-developer-mcp|||Figma design file access"
-    )
+                if [ -n "$server_data" ]; then
+                    local package=$(echo "$server_data" | jq -r '.package // "unknown"')
+                    local description=$(echo "$server_data" | jq -r '.description // "No description"')
+                    local impact=$(echo "$server_data" | jq -r '.impact.category // "Unknown"')
 
+                    # Check if installed
+                    local status=""
+                    local package_dir="$HOME/.mcp/servers/node_modules/${package}"
+                    if [ -d "$package_dir" ] || jq -e ".mcpServers.\"$server_name\"" "$CLAUDE_CONFIG" &>/dev/null; then
+                        status="${GREEN}[installed]${NC}"
+                    fi
+
+                    # Format output with impact indicator
+                    local impact_indicator=""
+                    case "$impact" in
+                        Heavy) impact_indicator="${RED}⬤${NC}" ;;
+                        Medium) impact_indicator="${YELLOW}⬤${NC}" ;;
+                        Light) impact_indicator="${GREEN}⬤${NC}" ;;
+                        *) impact_indicator="⚪" ;;
+                    esac
+
+                    printf "  %b %-23s %-40s %b\n" "$impact_indicator" "$server_name" "$package" "$status"
+                    printf "    └─ %s\n" "$description"
+                fi
+            fi
+        done <<< "$cat_servers"
+    }
+
+    # Category display names and emojis
     case "$category" in
         database|db)
-            echo -e "${YELLOW}Database Servers:${NC}"
-            for server in "${database[@]}"; do
-                print_server_array "$server"
-            done
+            echo -e "${YELLOW}💾 Database Servers:${NC}"
+            show_category_servers "database"
             ;;
         productivity|prod)
-            echo -e "${YELLOW}Productivity Servers:${NC}"
-            for server in "${productivity[@]}"; do
-                print_server_array "$server"
-            done
+            echo -e "${YELLOW}📝 Productivity Servers:${NC}"
+            show_category_servers "productivity"
             ;;
-        dev|developer)
-            echo -e "${YELLOW}Developer Tools:${NC}"
-            for server in "${developer[@]}"; do
-                print_server_array "$server"
-            done
+        dev|developer|dev-tools)
+            echo -e "${YELLOW}🛠️  Developer Tools:${NC}"
+            show_category_servers "dev-tools"
             ;;
-        search|data)
-            echo -e "${YELLOW}Search & Data:${NC}"
-            for server in "${search[@]}"; do
-                print_server_array "$server"
-            done
+        search)
+            echo -e "${YELLOW}🔍 Search Servers:${NC}"
+            show_category_servers "search"
             ;;
-        official)
-            echo -e "${YELLOW}Official MCP Servers:${NC}"
-            for server in "${official[@]}"; do
-                print_server_array "$server"
-            done
+        ai)
+            echo -e "${YELLOW}🤖 AI & Official Servers:${NC}"
+            show_category_servers "ai"
+            ;;
+        filesystem)
+            echo -e "${YELLOW}📁 Filesystem Servers:${NC}"
+            show_category_servers "filesystem"
             ;;
         *)
             # Show all categories
-            echo -e "${YELLOW}📚 Official Servers:${NC}"
-            for server in "${official[@]}"; do
-                print_server_array "$server"
-            done
-
-            echo -e "\n${YELLOW}💾 Database:${NC}"
-            for server in "${database[@]}"; do
-                print_server_array "$server"
-            done
-
-            echo -e "\n${YELLOW}🔍 Search & Research:${NC}"
-            for server in "${search[@]}"; do
-                print_server_array "$server"
-            done
-
-            echo -e "\n${YELLOW}📝 Productivity:${NC}"
-            for server in "${productivity[@]}"; do
-                print_server_array "$server"
-            done
-
-            echo -e "\n${YELLOW}🛠️  Developer Tools:${NC}"
-            for server in "${developer[@]}"; do
-                print_server_array "$server"
-            done
-
-            echo -e "\n${YELLOW}🎨 Design:${NC}"
-            for server in "${design[@]}"; do
-                print_server_array "$server"
-            done
+            while IFS= read -r cat; do
+                case "$cat" in
+                    database)
+                        echo -e "${YELLOW}💾 Database:${NC}"
+                        show_category_servers "$cat"
+                        echo ""
+                        ;;
+                    search)
+                        echo -e "${YELLOW}🔍 Search & Research:${NC}"
+                        show_category_servers "$cat"
+                        echo ""
+                        ;;
+                    productivity)
+                        echo -e "${YELLOW}📝 Productivity:${NC}"
+                        show_category_servers "$cat"
+                        echo ""
+                        ;;
+                    dev-tools)
+                        echo -e "${YELLOW}🛠️  Developer Tools:${NC}"
+                        show_category_servers "$cat"
+                        echo ""
+                        ;;
+                    ai)
+                        echo -e "${YELLOW}🤖 AI & Official:${NC}"
+                        show_category_servers "$cat"
+                        echo ""
+                        ;;
+                    filesystem)
+                        echo -e "${YELLOW}📁 Filesystem:${NC}"
+                        show_category_servers "$cat"
+                        echo ""
+                        ;;
+                esac
+            done <<< "$all_categories"
             ;;
     esac
 
     echo ""
+    echo -e "${BLUE}Impact Legend:${NC} ${RED}⬤${NC} Heavy  ${YELLOW}⬤${NC} Medium  ${GREEN}⬤${NC} Light"
+    echo ""
     echo -e "${BLUE}To install a server:${NC}"
     echo "  cd ~/.mcp/servers && npm install <package-name>"
-    echo "  Then add to Claude config with: mcp-toggle add <server-name>"
+    echo "  Then add to Claude config and sync: ./sync-all.sh"
     echo ""
     echo -e "${BLUE}Categories:${NC}"
-    echo "  mcp-toggle discover official       # Official MCP servers"
-    echo "  mcp-toggle discover database       # Database servers"
-    echo "  mcp-toggle discover productivity   # Productivity tools"
-    echo "  mcp-toggle discover dev            # Developer tools"
-    echo "  mcp-toggle discover search         # Search & data servers"
+    while IFS= read -r cat; do
+        echo "  mcp-toggle discover $cat"
+    done <<< "$all_categories"
     echo ""
-}
-
-# Print server info from array format (name|||package|||description)
-print_server_array() {
-    local server_data="$1"
-    local name=$(echo "$server_data" | cut -d'|' -f1)
-    local package=$(echo "$server_data" | cut -d'|' -f4)
-    local description=$(echo "$server_data" | cut -d'|' -f7-)
-
-    # Check if already installed
-    local status=""
-    if [ -d "$HOME/.mcp/servers/node_modules/$(echo $package | sed 's/@//' | cut -d'/' -f1-2)" ] || [ "$package" = "installed" ]; then
-        status="${GREEN}[installed]${NC}"
-    fi
-
-    printf "  %-25s %-40s %b\n" "$name" "$package" "$status"
-    printf "    └─ %s\n" "$description"
 }
 
 # Search npm for MCP packages
@@ -522,105 +559,10 @@ search_npm() {
     done
 
     echo ""
-    echo -e "${BLUE}To see more results, use:${NC}"
-    echo "  npm search \"mcp $query\""
+    echo -e "${BLUE}Tip:${NC} To see curated servers by category, use:"
+    echo "  mcp-toggle discover database"
+    echo "  mcp-toggle discover productivity"
     echo ""
-}
-
-# Health check for MCP servers
-health_check() {
-    local specific_server="$1"
-
-    echo -e "${BLUE}=== MCP Server Health Check ===${NC}\n"
-
-    local total_checked=0
-    local issues_found=0
-    local servers_to_check=()
-
-    # Determine which servers to check
-    if [ -n "$specific_server" ]; then
-        # Check if server exists and is enabled
-        if jq -e ".mcpServers.\"$specific_server\"" "$CLAUDE_CONFIG" &>/dev/null; then
-            servers_to_check=("$specific_server")
-        else
-            echo -e "${RED}Error: $specific_server is not enabled${NC}"
-            return 1
-        fi
-    else
-        # Check all enabled servers
-        while IFS= read -r server; do
-            [ -n "$server" ] && servers_to_check+=("$server")
-        done < <(jq -r '.mcpServers // {} | keys[]' "$CLAUDE_CONFIG" 2>/dev/null)
-    fi
-
-    if [ ${#servers_to_check[@]} -eq 0 ]; then
-        echo -e "${YELLOW}No enabled servers to check${NC}"
-        return 0
-    fi
-
-    # Check each server
-    for server in "${servers_to_check[@]}"; do
-        ((total_checked++))
-        echo -e "${BLUE}Checking:${NC} $server"
-
-        local server_issues=0
-
-        # Get server config
-        local command=$(jq -r ".mcpServers.\"$server\".command" "$CLAUDE_CONFIG" 2>/dev/null)
-        local env_vars=$(jq -r ".mcpServers.\"$server\".env // {} | keys[]" "$CLAUDE_CONFIG" 2>/dev/null)
-
-        # Check command availability
-        if [ -n "$command" ]; then
-            if command -v "$command" &>/dev/null; then
-                echo -e "  ${GREEN}✓${NC} Command '$command' is available"
-            else
-                echo -e "  ${RED}✗${NC} Command '$command' NOT FOUND"
-                ((server_issues++))
-            fi
-        fi
-
-        # Check environment variables
-        if [ -n "$env_vars" ]; then
-            while IFS= read -r env_var; do
-                if [ -n "$env_var" ]; then
-                    # Extract the variable name from ${VAR_NAME} format
-                    local var_name=$(echo "$env_var" | sed 's/\${//;s/}//')
-
-                    if [ -n "${!var_name:-}" ]; then
-                        echo -e "  ${GREEN}✓${NC} Environment variable $var_name is set"
-                    else
-                        echo -e "  ${RED}✗${NC} Environment variable $var_name NOT SET"
-                        ((server_issues++))
-                    fi
-                fi
-            done < <(jq -r ".mcpServers.\"$server\".env // {} | to_entries[] | .value" "$CLAUDE_CONFIG" 2>/dev/null)
-        fi
-
-        if [ $server_issues -eq 0 ]; then
-            echo -e "  ${GREEN}Status: Healthy${NC}"
-        else
-            echo -e "  ${YELLOW}Status: Issues found ($server_issues)${NC}"
-            ((issues_found+=server_issues))
-        fi
-        echo ""
-    done
-
-    # Summary
-    echo -e "${BLUE}=== Summary ===${NC}"
-    echo -e "  Servers checked: $total_checked"
-    if [ $issues_found -eq 0 ]; then
-        echo -e "  ${GREEN}✓ All checks passed!${NC}"
-        echo -e "  ${GREEN}All enabled servers are healthy${NC}"
-        return 0
-    else
-        echo -e "  ${YELLOW}⚠ Issues found: $issues_found${NC}"
-        echo ""
-        echo -e "${YELLOW}Recommendations:${NC}"
-        echo "  - Install missing commands (e.g., 'brew install node')"
-        echo "  - Set missing environment variables in ~/.zshrc or ~/.bashrc"
-        echo "  - Run 'source ~/.zshrc' to reload environment"
-        return 1
-    fi
 }
 
 # Draw an ASCII bar chart
@@ -769,35 +711,29 @@ show_help() {
     echo -e "${GREEN}Usage:${NC}"
     echo "  mcp-toggle enable <server-name...>    Enable disabled server(s)"
     echo "  mcp-toggle disable <server-name...>   Disable enabled server(s)"
-    echo "  mcp-toggle status [server-name]       Show status of server(s)"
-    echo "  mcp-toggle info <server-name>         Show server details and token impact"
+    echo "  mcp-toggle info [server-name]         Show server info (status, impact, health)"
+    echo "  mcp-toggle list                       List all servers (same as 'info')"
     echo "  mcp-toggle stats                      Show usage statistics and recommendations"
-    echo "  mcp-toggle health [server-name]       Check server health and dependencies"
-    echo "  mcp-toggle list                       List all servers (enabled and disabled)"
     echo "  mcp-toggle restart [server-name]      Show how to restart MCP servers"
-    echo "  mcp-toggle discover [category]        Discover popular MCP servers"
-    echo "  mcp-toggle search <query>             Search npm for MCP servers"
+    echo "  mcp-toggle discover [query]           Discover or search for MCP servers"
     echo "  mcp-toggle help                       Show this help message"
     echo ""
     echo -e "${GREEN}Examples:${NC}"
-    echo "  mcp-toggle disable figma              Disable Figma MCP server"
+    echo "  mcp-toggle                            List all servers (enabled and disabled)"
+    echo "  mcp-toggle info filesystem            Show detailed server info + health check"
     echo "  mcp-toggle enable figma puppeteer     Enable multiple servers at once"
     echo "  mcp-toggle disable github brave       Disable multiple servers at once"
-    echo "  mcp-toggle status figma               Check if Figma is enabled or disabled"
-    echo "  mcp-toggle info filesystem            Show filesystem server token impact"
     echo "  mcp-toggle stats                      Show statistics and recommendations"
-    echo "  mcp-toggle health                     Check all enabled servers"
-    echo "  mcp-toggle health filesystem          Check specific server health"
-    echo "  mcp-toggle list                       List all servers"
+    echo "  mcp-toggle discover                   Show all curated MCP servers"
+    echo "  mcp-toggle discover database          Show database category servers"
+    echo "  mcp-toggle discover postgres          Search npm for 'postgres'"
     echo "  mcp-toggle restart                    Show how to restart all MCP servers"
-    echo "  mcp-toggle discover                   Show all popular MCP servers"
-    echo "  mcp-toggle discover database          Show database MCP servers"
-    echo "  mcp-toggle search postgres            Search npm for postgres MCP servers"
     echo ""
     echo -e "${YELLOW}Notes:${NC}"
     echo "  - Configuration is preserved when disabling"
     echo "  - Backups are created automatically in ~/.mcp/backups/"
     echo "  - Disabled servers are stored in _disabled_mcpServers"
+    echo "  - 'info' command includes health check for enabled servers"
     echo ""
     echo -e "${BLUE}File Locations:${NC}"
     echo "  Config:  $CLAUDE_CONFIG"
@@ -827,34 +763,17 @@ main() {
         disable)
             disable_server "$@"
             ;;
-        status)
-            get_status "$1"
-            ;;
-        info)
+        info|list)
             show_server_info "$1"
             ;;
         stats)
             show_stats
             ;;
-        health)
-            health_check "$1"
-            ;;
-        list)
-            list_servers
-            ;;
         restart)
             restart_mcp "$1"
             ;;
         discover)
-            search_servers "" "$1"
-            ;;
-        search)
-            if [ -z "$1" ]; then
-                echo -e "${RED}Error: Search query required${NC}"
-                echo "Usage: mcp-toggle search <query>"
-                exit 1
-            fi
-            search_servers "$1"
+            discover_servers "$1"
             ;;
         help|--help|-h)
             show_help
@@ -863,8 +782,9 @@ main() {
             echo -e "${RED}Unknown command: ${YELLOW}$command${NC}"
             echo ""
             echo -e "${BLUE}Did you mean one of these?${NC}"
-            echo "  • list       Show all enabled/disabled servers"
+            echo "  • info       Show server info or list all servers"
             echo "  • stats      Show usage statistics"
+            echo "  • discover   Browse or search for MCP servers"
             echo "  • enable     Enable a disabled server"
             echo "  • disable    Disable an enabled server"
             echo "  • help       Show full help"
