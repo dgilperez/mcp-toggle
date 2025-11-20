@@ -250,6 +250,30 @@ show_server_info() {
 
     echo -e "${BLUE}Context Window Impact:${NC} ${impact_color}$impact${NC}"
     echo -e "${BLUE}Description:${NC} $description"
+
+    # Try to find installation path
+    local package_name=$(jq -r --arg s "$server_name" '.servers[$s].package // empty' "$MCP_CACHE" 2>/dev/null)
+    if [ -z "$package_name" ]; then
+        package_name=$(jq -r --arg s "$server_name" '.servers[$s].package // empty' "$LOCAL_OVERRIDE" 2>/dev/null)
+    fi
+
+    if [ -n "$package_name" ]; then
+        # Try to find in node_modules
+        local install_path="$HOME/.mcp/servers/node_modules/$package_name"
+        if [ -d "$install_path" ]; then
+            echo -e "${BLUE}Installed at:${NC} $install_path"
+        else
+            # Try to extract from args in config
+            local args_path=$(jq -r ".$config_section.\"$server_name\".args[0] // empty" "$CLAUDE_CONFIG" 2>/dev/null)
+            if [ -n "$args_path" ]; then
+                # Get the directory containing the script
+                install_path=$(dirname "$(dirname "$args_path")")
+                if [ -d "$install_path" ]; then
+                    echo -e "${BLUE}Installed at:${NC} $install_path"
+                fi
+            fi
+        fi
+    fi
     echo ""
 
     # Show configuration
