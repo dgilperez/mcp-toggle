@@ -43,8 +43,21 @@ Estimate based on typical response size:
 
 ## 2. Measuring Impact with Claude Code
 
-The most accurate way to measure impact:
+The most accurate way is to use the measurement script:
 
+```bash
+# Run locally (requires Claude Code installed)
+./scripts/measure-impact.sh
+```
+
+This script will:
+1. Open Claude Code in a new terminal
+2. Guide you through running `/context`
+3. Parse the MCP server token counts
+4. Automatically update `data/mcp-cache.json` with real measurements
+5. Change `"method": "manual"` → `"method": "measured"`
+
+**Manual method** (if you prefer):
 1. Start fresh Claude Code session
 2. Enable the MCP server you want to measure
 3. Use the `/context` command

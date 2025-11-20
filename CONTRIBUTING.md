@@ -36,18 +36,32 @@ One of the most valuable contributions is adding well-tested MCP servers to our 
 1. Test the MCP server thoroughly in your own setup
 2. Verify it works with Claude Code and other tools
 3. Document any required API keys or setup steps
-4. Add to the discovery list in `mcp-toggle.sh`:
+4. Measure the impact using the measurement script:
+   ```bash
+   ./scripts/measure-impact.sh
+   ```
+5. Add to `data/manual-metadata.json`:
 
-```bash
-# Find the CURATED_SERVERS array in mcp-toggle.sh
-# Add your server in the appropriate category
-
-# Database category example:
-"server-name|category|npm-package-name|description|required-env-vars"
-"mydb|database|@org/mydb-mcp|MyDB database connector|MYDB_API_KEY"
+```json
+{
+  "servers": {
+    "mydb": {
+      "package": "@org/mydb-mcp",
+      "description": "Clear description of what it does",
+      "impact": {
+        "estimated_tokens": 400,
+        "category": "Medium",
+        "method": "measured",
+        "measured_at": "2025-01-20"
+      },
+      "categories": ["database"]
+    }
+  }
+}
 ```
 
-5. Submit a PR with:
+6. Regenerate cache: `./scripts/generate-cache.sh`
+7. Submit a PR with:
    - Server added to curated list
    - Example usage in PR description
    - Documentation of required setup

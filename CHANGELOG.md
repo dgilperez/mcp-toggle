@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Impact Measurement System**: Real token usage measurement from Claude Code
+  - `scripts/measure-impact.sh` - Single script to measure and update impact data
+  - Parses Claude Code `/context` output automatically
+  - Updates cache with real measurements (`"method": "measured"`)
+  - Integrated into weekly GitHub Actions workflow
+  - Creates weekly reminder issues to update measurements
+- **Dynamic Category Display**: Discover command now fully dynamic
+  - Reads all categories from cache (no hardcoded lists)
+  - All 15+ categories work (communication, design, demo, utility, etc.)
+  - Unknown categories fall back to npm search
+- **Merged Commands**: Consolidated overlapping commands
+  - `health`, `status`, `info` → `info` (comprehensive health check)
+  - `discover`, `search` → `discover` (intelligent category vs search detection)
+- **Bulk Operations**: Enable/disable multiple servers at once
+  - `mcp-toggle enable server1 server2 server3`
+  - `mcp-toggle disable server1 server2`
+- **JSON Cache System**: Replaced hardcoded metadata
+  - `data/mcp-cache.json` - Main cache (auto-updated weekly)
+  - `data/manual-metadata.json` - Manual contributions
+  - Pulls from MCP official registry + npm stats
+  - Supports local overrides in `~/.mcp/local-metadata.json`
+
 ### Changed
 - **Retro Stats Display**: Redesigned `stats` command with clean retro ASCII aesthetic
   - Lightweight box drawing (┌─┐│└─┘) instead of heavy banners
@@ -15,6 +38,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - No colors - purely monochrome design
   - Simpler layout with better readability
 - **Improved Default Behavior**: Running `mcp-toggle` without args now shows server list with helpful tips instead of blank output
+- **Test Suite**: All tests updated to use merged commands (56/56 tests passing)
+
+### Fixed
+- Script robustness with `set -e` when optional files don't exist
+- Installation path detection in health checks
+- Category display handling for all cache categories
 
 ## [1.0.0] - 2025-11-19
 
