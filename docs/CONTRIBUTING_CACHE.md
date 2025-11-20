@@ -41,28 +41,33 @@ Estimate based on typical response size:
 }
 ```
 
-## 2. Measuring Impact with Claude Code
+## 2. Estimating Impact with Research-Based Heuristics
 
-The most accurate way is to use the measurement script:
+The impact estimation script uses research-based heuristics:
 
 ```bash
-# Run locally (requires Claude Code installed)
+# Run locally to estimate all enabled servers
 ./scripts/measure-impact.sh
+
+# Or estimate specific server
+./scripts/measure-impact.sh filesystem
 ```
 
-This script will:
-1. Open Claude Code in a new terminal
-2. Guide you through running `/context`
-3. Parse the MCP server token counts
-4. Automatically update `data/mcp-cache.json` with real measurements
-5. Change `"method": "manual"` → `"method": "measured"`
+This script:
+1. Uses research showing ~400-500 tokens per tool definition
+2. Applies known patterns for common server types:
+   - Heavy (1200+ tokens): filesystem, figma, puppeteer, obsidian
+   - Medium (500 tokens): github, postgres, sqlite, notion, pubmed
+   - Light (150 tokens): brave-search, slack, memory, time
+3. Updates `data/mcp-cache.json` with `"method": "heuristic"`
+4. Skips servers already marked as `"measured"` to preserve manual data
 
-**Manual method** (if you prefer):
+**For precise measurements** (recommended for PRs):
 1. Start fresh Claude Code session
 2. Enable the MCP server you want to measure
 3. Use the `/context` command
-4. Look for "MCP" section showing token usage per server
-5. Add measurement to `data/manual-metadata.json`
+4. Note the token count shown for each server
+5. Add to `data/manual-metadata.json` with `"method": "measured"`
 
 Example:
 ```bash
@@ -71,7 +76,7 @@ Example:
 
 # Output shows:
 # MCP: 1,234 tokens
-#   - filesystem: 1,200 tokens  <- This is what you want!
+#   - filesystem: 1,200 tokens  <- Real measurement!
 #   - brave-search: 34 tokens
 ```
 

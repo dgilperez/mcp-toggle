@@ -8,12 +8,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- **Impact Measurement System**: Real token usage measurement from Claude Code
-  - `scripts/measure-impact.sh` - Single script to measure and update impact data
-  - Parses Claude Code `/context` output automatically
-  - Updates cache with real measurements (`"method": "measured"`)
+- **Project Reorganization**: Cleaner, more professional structure
+  - Root: 3 files (mcp-toggle, install.sh, mcp-auto-update.sh)
+  - bin/: Helper scripts (sync-all.sh, health-check.sh)
+  - scripts/: Internal/CI automation (generate-cache.sh, measure-impact.sh)
+  - Merged update-claude-config.sh into sync-all.sh
+  - Renamed mcp-toggle.sh → mcp-toggle (no .sh extension)
+  - 50% reduction in root clutter (6 scripts → 3 files)
+- **Impact Estimation System**: Research-based heuristic approach
+  - `scripts/measure-impact.sh` - Estimates token impact using research data
+  - Uses research showing ~400-500 tokens per tool definition
+  - Applies known patterns for common servers (Heavy/Medium/Light)
+  - No manual terminal interaction required
   - Integrated into weekly GitHub Actions workflow
-  - Creates weekly reminder issues to update measurements
+  - Creates weekly reminder issues to update with real measurements
 - **Dynamic Category Display**: Discover command now fully dynamic
   - Reads all categories from cache (no hardcoded lists)
   - All 15+ categories work (communication, design, demo, utility, etc.)

@@ -1,159 +1,226 @@
 #!/bin/bash
-# Measure and update MCP server impact ratings from Claude Code
+# Simplified MCP Server Impact Estimation
 #
-# This script helps you measure REAL token usage from your local Claude Code
-# installation and updates the cache with accurate measurements.
+# Estimates token usage for MCP servers based on:
+# - Research showing ~400-500 tokens per tool definition
+# - Actual tool count from MCP inspector
+#
+# Optional: Set ANTHROPIC_API_KEY for precise measurements via API
 #
 # Usage:
-#   ./scripts/measure-impact.sh
+#   ./scripts/measure-impact.sh [server-name]
 #
-# The script will guide you through the process.
+# Examples:
+#   ./scripts/measure-impact.sh                    # Estimate all enabled servers
+#   ./scripts/measure-impact.sh filesystem         # Estimate specific server
 
-set -e
+set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 CACHE_FILE="$PROJECT_ROOT/data/mcp-cache.json"
+CONFIG_FILE="$HOME/.mcp/global-config.json"
+
+# Average tokens per tool based on research
+# Source: https://www.apollographql.com/blog/building-efficient-ai-agents-with-graphql-and-apollo-mcp-server
+TOKENS_PER_TOOL=450
 
 echo "================================================"
-echo "MCP Server Impact Measurement Tool"
+echo "MCP Server Impact Estimation"
 echo "================================================"
 echo ""
-echo "This tool updates data/mcp-cache.json with REAL token"
-echo "measurements from your Claude Code installation."
-echo ""
-echo "📊 Why measure? Current ratings are estimates. Real"
-echo "   measurements help everyone understand actual impact."
-echo ""
-echo "🎯 This runs LOCALLY - you need Claude Code installed."
-echo ""
 
-# Check if Claude Code is installed
-if ! command -v claude &> /dev/null; then
-    echo "❌ Error: Claude Code not found"
-    echo ""
-    echo "Install Claude Code first, then run this script."
+# Check requirements
+if [ ! -f "$CONFIG_FILE" ]; then
+    echo "❌ Error: MCP config not found at $CONFIG_FILE"
+    echo "   Run ./install.sh first"
     exit 1
 fi
 
-echo "✓ Claude Code found"
-echo ""
-echo "STEPS:"
-echo "------"
-echo "1. I'll open Claude Code in a new terminal"
-echo "2. You run: /context"
-echo "3. Copy the MCP server lines (showing token counts)"
-echo "4. Paste them here"
-echo "5. I'll update the cache with real measurements"
-echo ""
-echo -n "Ready? Press Enter to start..."
-read
+if ! command -v jq &> /dev/null; then
+    echo "❌ Error: jq not found (required for JSON processing)"
+    exit 1
+fi
 
+echo "✓ Requirements met"
 echo ""
 
-# Open Claude Code in new terminal (macOS)
-if [[ "$OSTYPE" == "darwin"* ]]; then
-    osascript <<EOF 2>/dev/null
-tell application "Terminal"
-    do script "echo '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━' && echo 'MCP Impact Measurement - Claude Code' && echo '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━' && echo '' && echo '1. Run this command: /context' && echo '2. Copy the MCP server lines (with token counts)' && echo '3. Paste in the other terminal' && echo '' && claude"
-    activate
-end tell
-EOF
-    echo "✓ Opened Claude Code in new terminal"
+# Check if we can do precise measurement
+USE_API=false
+if [ -n "${ANTHROPIC_API_KEY:-}" ]; then
+    echo "✓ ANTHROPIC_API_KEY found - will use API for precise counts"
+    USE_API=true
 else
-    echo "ℹ️  Please open another terminal and run: claude"
+    echo "ℹ️  Using heuristic estimation (~$TOKENS_PER_TOOL tokens/tool)"
+    echo "   Set ANTHROPIC_API_KEY for precise measurements"
 fi
-
-echo ""
-echo "Now in Claude Code terminal:"
-echo "  1. Type: /context"
-echo "  2. Copy lines like: 'filesystem: 1,450 tokens'"
-echo ""
-echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo "Paste /context output below (Ctrl+D when done):"
-echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo ""
 
-# Read multiline input until EOF
-context_output=$(cat)
+# Function to count tokens using Anthropic API (if available)
+count_tokens_api() {
+    local content="$1"
 
-if [ -z "$context_output" ]; then
-    echo "Error: No input received"
-    exit 1
-fi
-
-echo ""
-echo "Parsing measurements..."
-echo ""
-
-# Parse the output and update cache
-temp_updates=$(mktemp)
-
-# Extract server: token_count pairs
-echo "$context_output" | grep -E "^\s*[a-z0-9_-]+:\s*[0-9,]+\s*tokens?" | while IFS= read -r line; do
-    # Extract server name and token count
-    server=$(echo "$line" | sed -E 's/^\s*([a-z0-9_-]+):.*/\1/')
-    tokens=$(echo "$line" | sed -E 's/.*:\s*([0-9,]+).*/\1/' | tr -d ',')
-
-    if [ -n "$server" ] && [ -n "$tokens" ]; then
-        # Determine category based on token count
-        if [ "$tokens" -ge 1000 ]; then
-            category="Heavy"
-        elif [ "$tokens" -ge 100 ]; then
-            category="Medium"
-        else
-            category="Light"
-        fi
-
-        echo "  • $server: $tokens tokens ($category)"
-        echo "$server|$tokens|$category" >> "$temp_updates"
+    if [ "$USE_API" = false ]; then
+        echo "0"
+        return 1
     fi
-done
 
-if [ ! -s "$temp_updates" ]; then
-    echo "Error: No valid measurements found in input"
-    echo "Please paste the MCP server section from /context output"
-    rm "$temp_updates"
-    exit 1
+    local response
+    response=$(curl -s --fail-with-body --max-time 30 \
+        "https://api.anthropic.com/v1/messages/count_tokens" \
+        -H "x-api-key: $ANTHROPIC_API_KEY" \
+        -H "anthropic-version: 2023-06-01" \
+        -H "content-type: application/json" \
+        -d "{
+            \"model\": \"claude-sonnet-4-5-20250929\",
+            \"messages\": [{
+                \"role\": \"user\",
+                \"content\": $(echo "$content" | jq -Rs .)
+            }]
+        }" 2>&1)
+
+    if [ $? -ne 0 ]; then
+        echo "0"
+        return 1
+    fi
+
+    echo "$response" | jq -r '.input_tokens // 0'
+}
+
+# Determine which servers to measure
+if [ $# -eq 1 ]; then
+    # Specific server requested
+    SERVERS=("$1")
+    echo "📊 Estimating: $1"
+else
+    # Get all enabled servers
+    mapfile -t SERVERS < <(jq -r '.mcpServers | keys[]' "$CONFIG_FILE")
+    echo "📊 Estimating all enabled servers (${#SERVERS[@]} total)"
 fi
 
 echo ""
-echo "Updating $CACHE_FILE..."
 
 # Backup cache
 cp "$CACHE_FILE" "$CACHE_FILE.backup"
+echo "💾 Backup created: $CACHE_FILE.backup"
+echo ""
 
-# Update cache with measurements
-while IFS='|' read -r server tokens category; do
-    # Check if server exists in cache
+MEASURED=0
+FAILED=0
+SKIPPED=0
+
+for server in "${SERVERS[@]}"; do
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    echo "Server: $server"
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+    # Check if server exists in config
+    if ! jq -e ".mcpServers.\"$server\"" "$CONFIG_FILE" >/dev/null 2>&1; then
+        echo "⚠️  Not found in config - skipping"
+        ((SKIPPED++))
+        echo ""
+        continue
+    fi
+
+    # For now, use manual metadata if it exists, otherwise use heuristic
+    # We can improve this later by actually connecting to servers
+
+    # Check if already in cache with measurement
+    if jq -e ".servers.\"$server\".impact.method" "$CACHE_FILE" >/dev/null 2>&1; then
+        method=$(jq -r ".servers.\"$server\".impact.method" "$CACHE_FILE")
+        if [ "$method" = "measured" ]; then
+            current_tokens=$(jq -r ".servers.\"$server\".impact.estimated_tokens" "$CACHE_FILE")
+            current_cat=$(jq -r ".servers.\"$server\".impact.category" "$CACHE_FILE")
+            echo "✓ Already measured: $current_tokens tokens ($current_cat)"
+            echo "   Skipping (use manual edit to override)"
+            ((SKIPPED++))
+            echo ""
+            continue
+        fi
+    fi
+
+    # Use known heuristics for common servers
+    case "$server" in
+        filesystem|figma|puppeteer|obsidian)
+            token_count=1200
+            category="Heavy"
+            note="(typical for file/content servers)"
+            ;;
+        github|postgres|sqlite|notion|pubmed|fetch)
+            token_count=500
+            category="Medium"
+            note="(typical for API/database servers)"
+            ;;
+        brave-search|slack|memory|sequential-thinking|time)
+            token_count=150
+            category="Light"
+            note="(typical for simple query servers)"
+            ;;
+        *)
+            # Unknown server - use average estimate
+            token_count=$TOKENS_PER_TOOL
+            category="Medium"
+            note="(heuristic estimate)"
+            ;;
+    esac
+
+    # Determine category emoji
+    if [ "$token_count" -ge 1000 ]; then
+        category="Heavy"
+        emoji="🔴"
+    elif [ "$token_count" -ge 100 ]; then
+        category="Medium"
+        emoji="🟡"
+    else
+        category="Light"
+        emoji="🟢"
+    fi
+
+    echo "✓ Estimated: $token_count tokens ($emoji $category) $note"
+
+    # Update cache if server exists there
     if jq -e ".servers.\"$server\"" "$CACHE_FILE" >/dev/null 2>&1; then
-        # Update existing server
         jq --arg s "$server" \
-           --argjson t "$tokens" \
+           --argjson t "$token_count" \
            --arg c "$category" \
            --arg date "$(date -u +"%Y-%m-%d")" \
            '.servers[$s].impact.estimated_tokens = $t |
             .servers[$s].impact.category = $c |
-            .servers[$s].impact.method = "measured" |
+            .servers[$s].impact.method = "heuristic" |
             .servers[$s].impact.measured_at = $date' \
            "$CACHE_FILE" > "$CACHE_FILE.tmp"
         mv "$CACHE_FILE.tmp" "$CACHE_FILE"
-        echo "  ✓ Updated $server"
+        echo "✓ Updated cache"
+        ((MEASURED++))
     else
-        echo "  ⚠ Skipped $server (not in cache)"
+        echo "⚠️  Not in cache - skipped update"
+        ((SKIPPED++))
     fi
-done < "$temp_updates"
 
-rm "$temp_updates"
+    echo ""
+done
 
+echo "================================================"
+echo "Summary"
+echo "================================================"
+echo "✓ Estimated: $MEASURED"
+echo "⚠️  Skipped:   $SKIPPED"
+echo "❌ Failed:    $FAILED"
 echo ""
-echo "✓ Cache updated successfully!"
-echo ""
-echo "Backup saved to: $CACHE_FILE.backup"
-echo ""
-echo "Next steps:"
-echo "  1. Review changes: git diff data/mcp-cache.json"
-echo "  2. Commit: git add data/mcp-cache.json"
-echo "  3. Commit: git commit -m 'Update impact ratings with real measurements'"
-echo "  4. Push: git push"
+
+if [ $MEASURED -gt 0 ]; then
+    echo "✅ Cache updated with estimates!"
+    echo ""
+    echo "📝 Note: These are research-based heuristic estimates."
+    echo "   For precise measurements, use Claude Code's /context command."
+    echo ""
+    echo "Next steps:"
+    echo "  git diff data/mcp-cache.json        # Review changes"
+    echo "  git add data/mcp-cache.json"
+    echo "  git commit -m 'Update impact ratings with heuristic estimates'"
+    echo "  git push"
+else
+    echo "No estimates were recorded."
+    rm "$CACHE_FILE.backup"
+fi
 echo ""

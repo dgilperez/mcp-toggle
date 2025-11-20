@@ -449,23 +449,24 @@ We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for gene
 
 The MCP server cache (`data/mcp-cache.json`) is automatically updated weekly. To contribute:
 
-1. **Measure impact with real data**:
+1. **Estimate impact with heuristics**:
    ```bash
-   # Run locally (requires Claude Code installed)
+   # Run locally to estimate token impact
    ./scripts/measure-impact.sh
    ```
-   This opens Claude Code, guides you through `/context`, and updates the cache with real measurements.
+   Uses research-based estimates (~400-500 tokens/tool) and known patterns for common servers.
 
-2. **Add descriptions and categories** - Edit `data/manual-metadata.json`
+2. **Add real measurements** (recommended for PRs):
+   - Use Claude Code's `/context` command to get real token counts
+   - Add to `data/manual-metadata.json` with `"method": "measured"`
 
 3. **Submit PR** - See [docs/CONTRIBUTING_CACHE.md](docs/CONTRIBUTING_CACHE.md) for details
 
-**How measurement works:**
-- Uses Claude Code's `/context` command to get **real token usage**
-- Measures actual MCP server overhead, not estimates
-- Updates cache with accurate baseline measurements
+**How impact estimation works:**
+- Research shows MCP tool definitions typically use ~400-500 tokens each
+- Script applies known patterns: Heavy (1200+), Medium (500), Light (150)
+- For precise data, use `/context` in Claude Code to measure actual usage
 - Impact categories: Heavy (1000+ tokens), Medium (100-1000), Light (<100)
-- Weekly workflow creates reminder issues to measure
 
 The cache system:
 - Pulls from MCP official registry + npm stats
