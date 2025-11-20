@@ -93,8 +93,11 @@ if [ $# -eq 1 ]; then
     SERVERS=("$1")
     echo "📊 Estimating: $1"
 else
-    # Get all enabled servers
-    mapfile -t SERVERS < <(jq -r '.mcpServers | keys[]' "$CONFIG_FILE")
+    # Get all enabled servers (compatible with bash 3.x)
+    SERVERS=()
+    while IFS= read -r server; do
+        SERVERS+=("$server")
+    done < <(jq -r '.mcpServers | keys[]' "$CONFIG_FILE")
     echo "📊 Estimating all enabled servers (${#SERVERS[@]} total)"
 fi
 
