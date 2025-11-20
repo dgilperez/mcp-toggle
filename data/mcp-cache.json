@@ -13,10 +13,10 @@
       "package": "@modelcontextprotocol/server-filesystem",
       "description": "Reads/writes files; returns full file contents in context",
       "impact": {
-        "estimated_tokens": 1500,
+        "estimated_tokens": 1200,
         "category": "Heavy",
-        "method": "manual",
-        "measured_at": "2025-01-19"
+        "method": "heuristic",
+        "measured_at": "2025-11-20"
       },
       "categories": [
         "filesystem",
@@ -27,10 +27,10 @@
       "package": "@modelcontextprotocol/server-brave-search",
       "description": "Returns search results; compact responses",
       "impact": {
-        "estimated_tokens": 50,
-        "category": "Light",
-        "method": "manual",
-        "measured_at": "2025-01-19"
+        "estimated_tokens": 150,
+        "category": "Medium",
+        "method": "heuristic",
+        "measured_at": "2025-11-20"
       },
       "categories": [
         "search",
@@ -43,8 +43,8 @@
       "impact": {
         "estimated_tokens": 500,
         "category": "Medium",
-        "method": "manual",
-        "measured_at": "2025-01-19"
+        "method": "heuristic",
+        "measured_at": "2025-11-20"
       },
       "categories": [
         "dev-tools",
@@ -55,10 +55,10 @@
       "package": "@cyanheads/pubmed-mcp-server",
       "description": "Scientific papers; abstract-heavy responses",
       "impact": {
-        "estimated_tokens": 600,
+        "estimated_tokens": 500,
         "category": "Medium",
-        "method": "manual",
-        "measured_at": "2025-01-19"
+        "method": "heuristic",
+        "measured_at": "2025-11-20"
       },
       "categories": [
         "search",
@@ -69,10 +69,10 @@
       "package": "figma-developer-mcp",
       "description": "Design files; large JSON responses with layer data",
       "impact": {
-        "estimated_tokens": 2000,
+        "estimated_tokens": 1200,
         "category": "Heavy",
-        "method": "manual",
-        "measured_at": "2025-01-19"
+        "method": "heuristic",
+        "measured_at": "2025-11-20"
       },
       "categories": [
         "design",
@@ -83,10 +83,10 @@
       "package": "@modelcontextprotocol/server-puppeteer",
       "description": "Full webpage scraping; returns complete HTML/DOM",
       "impact": {
-        "estimated_tokens": 1800,
+        "estimated_tokens": 1200,
         "category": "Heavy",
-        "method": "manual",
-        "measured_at": "2025-01-19"
+        "method": "heuristic",
+        "measured_at": "2025-11-20"
       },
       "categories": [
         "web",
@@ -123,10 +123,10 @@
       "package": "@notionhq/notion-mcp-server",
       "description": "Notion pages; moderate content per page",
       "impact": {
-        "estimated_tokens": 450,
+        "estimated_tokens": 500,
         "category": "Medium",
-        "method": "manual",
-        "measured_at": "2025-01-19"
+        "method": "heuristic",
+        "measured_at": "2025-11-20"
       },
       "categories": [
         "productivity",
@@ -165,10 +165,10 @@
       "package": "@modelcontextprotocol/server-memory",
       "description": "Official MCP server; minimal token usage",
       "impact": {
-        "estimated_tokens": 30,
-        "category": "Light",
-        "method": "manual",
-        "measured_at": "2025-01-19"
+        "estimated_tokens": 150,
+        "category": "Medium",
+        "method": "heuristic",
+        "measured_at": "2025-11-20"
       },
       "categories": [
         "ai",
