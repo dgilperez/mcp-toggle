@@ -456,16 +456,25 @@ The MCP server cache (`data/mcp-cache.json`) is automatically updated weekly. To
    ```
    Uses research-based estimates (~400-500 tokens/tool) and known patterns for common servers.
 
-2. **Add real measurements** (recommended for PRs):
-   - Use Claude Code's `/context` command to get real token counts
+2. **Extract from your actual usage** (most accurate):
+   ```bash
+   # Analyze your Claude Code JSONL logs
+   ./scripts/extract-mcp-baseline.sh
+   ```
+   Parses real session data to extract baseline token consumption. Shows which MCP servers
+   were active and estimates their overhead.
+
+3. **Add manual measurements** (recommended for PRs):
+   - Use Claude Code's `/context` command to get per-server token counts
    - Add to `data/manual-metadata.json` with `"method": "measured"`
 
-3. **Submit PR** - See [docs/CONTRIBUTING_CACHE.md](docs/CONTRIBUTING_CACHE.md) for details
+4. **Submit PR** - See [docs/CONTRIBUTING_CACHE.md](docs/CONTRIBUTING_CACHE.md) for details
 
 **How impact estimation works:**
 - Research shows MCP tool definitions typically use ~400-500 tokens each
-- Script applies known patterns: Heavy (1200+), Medium (500), Light (150)
-- For precise data, use `/context` in Claude Code to measure actual usage
+- Heuristic script applies known patterns: Heavy (1200+), Medium (500), Light (150)
+- JSONL extraction provides real session data but can't isolate individual servers
+- For precise per-server data, use `/context` in Claude Code
 - Impact categories: Heavy (1000+ tokens), Medium (100-1000), Light (<100)
 
 The cache system:
