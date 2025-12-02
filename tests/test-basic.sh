@@ -105,6 +105,28 @@ test_gitignore_coverage() {
     if grep -q "\.claude/" "$PROJECT_ROOT/.gitignore"; then pass ".gitignore covers .claude/"; else fail ".claude/ not in .gitignore"; fi
 }
 
+# Test 7: Check no duplicate servers in config
+test_no_duplicate_servers() {
+    test_header "No duplicate servers in config"
+
+    # Only run if Claude config exists and has jq
+    if [[ ! -f "$HOME/.claude.json" ]] || ! command -v jq >/dev/null 2>&1; then
+        pass "Skipped (no config or jq)"
+        return
+    fi
+
+    # Find duplicates between enabled and disabled sections
+    local duplicates=$(comm -12 \
+        <(jq -r '.mcpServers // {} | keys[]' "$HOME/.claude.json" 2>/dev/null | sort) \
+        <(jq -r '._disabled_mcpServers // {} | keys[]' "$HOME/.claude.json" 2>/dev/null | sort) 2>/dev/null)
+
+    if [[ -z "$duplicates" ]]; then
+        pass "No duplicate servers in config"
+    else
+        fail "Found duplicate servers: $duplicates"
+    fi
+}
+
 # Run all tests
 echo ""
 test_core_scripts_exist
@@ -113,6 +135,7 @@ test_documentation_exists
 test_required_commands
 test_no_hardcoded_paths
 test_gitignore_coverage
+test_no_duplicate_servers
 
 # Summary
 echo ""

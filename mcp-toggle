@@ -57,6 +57,34 @@ backup_config() {
     echo -e "${BLUE}Backup created: $backup_file${NC}"
 }
 
+# Clean up duplicate servers (prioritize enabled over disabled)
+cleanup_duplicates() {
+    # Find servers in both mcpServers and _disabled_mcpServers
+    local duplicates=$(comm -12 \
+        <(jq -r '.mcpServers // {} | keys[]' "$CLAUDE_CONFIG" 2>/dev/null | sort) \
+        <(jq -r '._disabled_mcpServers // {} | keys[]' "$CLAUDE_CONFIG" 2>/dev/null | sort))
+
+    if [ -z "$duplicates" ]; then
+        return 0
+    fi
+
+    echo -e "${YELLOW}⚠ Found duplicate server entries${NC}"
+
+    # Remove duplicates from _disabled_mcpServers (keep in enabled)
+    local temp_file=$(mktemp)
+    local jq_script='.'
+    while IFS= read -r server; do
+        if [ -n "$server" ]; then
+            echo -e "${YELLOW}  Removing duplicate: $server (keeping in enabled)${NC}"
+            jq_script="$jq_script | del(._disabled_mcpServers[\"$server\"])"
+        fi
+    done <<< "$duplicates"
+
+    jq "$jq_script" "$CLAUDE_CONFIG" > "$temp_file"
+    mv "$temp_file" "$CLAUDE_CONFIG"
+    echo -e "${GREEN}✓ Cleaned up duplicates${NC}"
+}
+
 # List all servers
 list_servers() {
     echo -e "${BLUE}=== MCP Servers ===${NC}\n"
@@ -375,6 +403,10 @@ enable_server() {
         exit 1
     fi
 
+    # Backup and cleanup before any operations
+    backup_config
+    cleanup_duplicates
+
     # Validate all servers first (atomic operation)
     local to_enable=()
     for server_name in "${server_names[@]}"; do
@@ -397,9 +429,6 @@ enable_server() {
     if [ ${#to_enable[@]} -eq 0 ]; then
         return 0
     fi
-
-    # Backup before changes
-    backup_config
 
     # Enable all servers in one operation
     local temp_file=$(mktemp)
@@ -426,6 +455,10 @@ disable_server() {
         exit 1
     fi
 
+    # Backup and cleanup before any operations
+    backup_config
+    cleanup_duplicates
+
     # Validate all servers first (atomic operation)
     local to_disable=()
     for server_name in "${server_names[@]}"; do
@@ -448,9 +481,6 @@ disable_server() {
     if [ ${#to_disable[@]} -eq 0 ]; then
         return 0
     fi
-
-    # Backup before changes
-    backup_config
 
     # Disable all servers in one operation
     local temp_file=$(mktemp)
