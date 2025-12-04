@@ -747,12 +747,47 @@ search_npm() {
 install_server() {
     local package_name="$1"
 
-    if [ -z "$package_name" ]; then
-        echo -e "${RED}Error: Package name required${NC}"
-        echo "Usage: $0 install <package-name>"
+    # Handle help flag
+    if [ -z "$package_name" ] || [ "$package_name" = "--help" ] || [ "$package_name" = "-h" ]; then
+        echo -e "${BLUE}MCP Server Installation${NC}"
         echo ""
-        echo "Example:"
+        echo "Install and configure an MCP server in one command."
+        echo ""
+        echo -e "${GREEN}Usage:${NC}"
+        echo "  mcp-toggle install <package-name>"
+        echo ""
+        echo -e "${GREEN}Examples:${NC}"
         echo "  mcp-toggle install @playwright/mcp"
+        echo "  mcp-toggle install @modelcontextprotocol/server-github"
+        echo "  mcp-toggle install mcp-server-postgres"
+        echo ""
+        echo -e "${BLUE}What it does:${NC}"
+        echo "  1. Installs npm package to ~/.mcp/servers/"
+        echo "  2. Auto-detects server configuration"
+        echo "  3. Adds to global MCP config"
+        echo "  4. Syncs to all editors"
+        echo "  5. Creates backup before changes"
+        echo ""
+        echo -e "${BLUE}Find packages:${NC}"
+        echo "  mcp-toggle discover           # Browse curated servers"
+        echo "  mcp-toggle discover playwright # Search npm"
+        echo ""
+        return 0
+    fi
+
+    # Validate package name (basic sanity check)
+    if [[ "$package_name" =~ ^- ]] || [[ ! "$package_name" =~ ^[@a-zA-Z0-9/_-]+$ ]]; then
+        echo -e "${RED}Error: Invalid package name: $package_name${NC}"
+        echo ""
+        echo "Package names should:"
+        echo "  • Start with @ (scoped) or a letter"
+        echo "  • Contain only letters, numbers, -, _, /, @"
+        echo ""
+        echo "Examples of valid names:"
+        echo "  @playwright/mcp"
+        echo "  @modelcontextprotocol/server-github"
+        echo "  mcp-server-postgres"
+        echo ""
         return 1
     fi
 
@@ -870,6 +905,137 @@ install_server() {
     echo "  2. Restart your editor to load the new server"
     echo "  3. Check server status:"
     echo "     mcp-toggle info $server_name"
+    echo ""
+}
+
+# Uninstall MCP server completely
+uninstall_server() {
+    local server_name="$1"
+
+    # Handle help flag
+    if [ -z "$server_name" ] || [ "$server_name" = "--help" ] || [ "$server_name" = "-h" ]; then
+        echo -e "${BLUE}MCP Server Uninstallation${NC}"
+        echo ""
+        echo "Completely remove an MCP server (config + npm package)."
+        echo ""
+        echo -e "${GREEN}Usage:${NC}"
+        echo "  mcp-toggle uninstall <server-name>"
+        echo ""
+        echo -e "${GREEN}Examples:${NC}"
+        echo "  mcp-toggle uninstall notion-smithery"
+        echo "  mcp-toggle uninstall playwright"
+        echo ""
+        echo -e "${BLUE}What it does:${NC}"
+        echo "  1. Removes from config (enabled or disabled)"
+        echo "  2. Uninstalls npm package from ~/.mcp/servers/"
+        echo "  3. Syncs changes to all editors"
+        echo "  4. Creates backup before changes"
+        echo ""
+        echo -e "${YELLOW}Note:${NC} To just disable (keep config), use:"
+        echo "  mcp-toggle disable <server-name>"
+        echo ""
+        return 0
+    fi
+
+    echo -e "${BLUE}=== Uninstalling MCP Server ===${NC}\n"
+    echo "Server: $server_name"
+    echo ""
+
+    # Check if server exists in config
+    local in_enabled=false
+    local in_disabled=false
+    local package_name=""
+
+    if jq -e ".mcpServers.\"$server_name\"" "$CLAUDE_CONFIG" &>/dev/null; then
+        in_enabled=true
+    fi
+
+    if jq -e "._disabled_mcpServers.\"$server_name\"" "$CLAUDE_CONFIG" &>/dev/null; then
+        in_disabled=true
+    fi
+
+    if [ "$in_enabled" = false ] && [ "$in_disabled" = false ]; then
+        echo -e "${RED}Error: Server $server_name not found in configuration${NC}"
+        echo ""
+        echo "Available servers:"
+        ./mcp-toggle list | grep -E "^\s+[✓✗]" | sed 's/^/  /'
+        return 1
+    fi
+
+    # Backup before changes
+    backup_config
+
+    # Remove from Claude config
+    local temp_file=$(mktemp)
+    jq "del(.mcpServers.\"$server_name\") | del(._disabled_mcpServers.\"$server_name\")" "$CLAUDE_CONFIG" > "$temp_file"
+    mv "$temp_file" "$CLAUDE_CONFIG"
+    echo -e "${GREEN}✓ Removed from Claude config${NC}"
+
+    # Also remove from global config (source of truth)
+    local global_config="$HOME/.mcp/global-config.json"
+    if [ -f "$global_config" ]; then
+        local temp_file=$(mktemp)
+        jq "del(.mcpServers.\"$server_name\") | del(._disabled_mcpServers.\"$server_name\")" "$global_config" > "$temp_file"
+        mv "$temp_file" "$global_config"
+        echo -e "${GREEN}✓ Removed from global config${NC}"
+    fi
+
+    # Try to find and remove npm package
+    local servers_dir="$HOME/.mcp/servers"
+    if [ -d "$servers_dir/node_modules" ]; then
+        # Try to find package by server name
+        local found_packages=()
+
+        # Search for packages that might match this server
+        while IFS= read -r pkg; do
+            if [ -n "$pkg" ]; then
+                found_packages+=("$pkg")
+            fi
+        done < <(find "$servers_dir/node_modules" -maxdepth 2 -name "package.json" -type f | while read -r pjson; do
+            local pkg_dir=$(dirname "$pjson")
+            local pkg_name=$(jq -r '.name' "$pjson" 2>/dev/null)
+
+            # Check if package name matches server name
+            if [[ "$pkg_name" == *"$server_name"* ]] || [[ "$server_name" == *"$(basename "$pkg_dir")"* ]]; then
+                echo "$pkg_name"
+            fi
+        done)
+
+        if [ ${#found_packages[@]} -gt 0 ]; then
+            echo ""
+            echo -e "${BLUE}Found matching package(s):${NC}"
+            for pkg in "${found_packages[@]}"; do
+                echo "  • $pkg"
+            done
+            echo ""
+
+            read -p "Uninstall these packages? [y/N] " -n 1 -r
+            echo
+
+            if [[ $REPLY =~ ^[Yy]$ ]]; then
+                cd "$servers_dir"
+                for pkg in "${found_packages[@]}"; do
+                    npm uninstall "$pkg" >/dev/null 2>&1
+                    echo -e "${GREEN}✓ Uninstalled $pkg${NC}"
+                done
+            else
+                echo -e "${YELLOW}Skipped npm package removal${NC}"
+            fi
+        else
+            echo -e "${YELLOW}⚠ Could not find matching npm package${NC}"
+            echo "  To manually remove: cd ~/.mcp/servers && npm uninstall <package-name>"
+        fi
+    fi
+
+    # Sync to editors
+    echo ""
+    echo -e "${BLUE}Syncing to editors...${NC}"
+    if [ -x "$SCRIPT_DIR/bin/sync-all.sh" ]; then
+        "$SCRIPT_DIR/bin/sync-all.sh" 2>&1 | grep -E "(✓|Syncing)" || true
+    fi
+
+    echo ""
+    echo -e "${GREEN}✓ Uninstallation complete!${NC}"
     echo ""
 }
 
@@ -1024,6 +1190,7 @@ show_help() {
     echo "  mcp-toggle stats                      Show usage statistics and recommendations"
     echo "  mcp-toggle discover [query]           Discover or search for MCP servers"
     echo "  mcp-toggle install <package-name>     Install and configure an MCP server"
+    echo "  mcp-toggle uninstall <server-name>    Completely remove a server (config + package)"
     echo "  mcp-toggle restart [server-name]      Show how to restart MCP servers"
     echo "  mcp-toggle help                       Show this help message"
     echo ""
@@ -1038,6 +1205,7 @@ show_help() {
     echo "  mcp-toggle discover database          Show database category servers"
     echo "  mcp-toggle discover playwright        Search npm for 'playwright'"
     echo "  mcp-toggle install @playwright/mcp    Install and configure Playwright server"
+    echo "  mcp-toggle uninstall notion-smithery  Completely remove notion-smithery"
     echo "  mcp-toggle restart                    Show how to restart all MCP servers"
     echo ""
     echo -e "${YELLOW}Notes:${NC}"
@@ -1090,6 +1258,9 @@ main() {
         install)
             install_server "$1"
             ;;
+        uninstall)
+            uninstall_server "$1"
+            ;;
         restart)
             restart_mcp "$1"
             ;;
@@ -1104,6 +1275,7 @@ main() {
             echo "  • stats      Show usage statistics"
             echo "  • discover   Browse or search for MCP servers"
             echo "  • install    Install and configure a server"
+            echo "  • uninstall  Completely remove a server"
             echo "  • enable     Enable a disabled server"
             echo "  • disable    Disable an enabled server"
             echo "  • help       Show full help"
