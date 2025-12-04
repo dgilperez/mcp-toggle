@@ -707,17 +707,169 @@ search_npm() {
 
     echo -e "${YELLOW}Searching npm for: $query${NC}\n"
 
-    # Search npm and format results
-    npm search "mcp $query" 2>/dev/null | head -20 | grep -v "^NAME" | while IFS= read -r line; do
-        if [ -n "$line" ]; then
-            echo "  $line"
-        fi
-    done
+    # Search npm with JSON output for better parsing
+    local results=$(npm search "mcp $query" --json 2>/dev/null)
+
+    if [ -z "$results" ] || [ "$results" = "[]" ]; then
+        echo "  No packages found"
+        echo ""
+        return
+    fi
+
+    # Parse and display results with better formatting
+    echo "$results" | jq -r '
+        # Sort by quality score (if available) and date
+        sort_by(.date) | reverse |
+        .[:10] |
+        .[] |
+        # Format output
+        "  \(.name)\n    v\(.version) | Updated: \(.date[:10]) | \(.description[:80])"
+    ' 2>/dev/null || {
+        # Fallback to simple text search if jq parsing fails
+        npm search "mcp $query" 2>/dev/null | head -20 | grep -v "^NAME" | while IFS= read -r line; do
+            if [ -n "$line" ]; then
+                echo "  $line"
+            fi
+        done
+    }
 
     echo ""
-    echo -e "${BLUE}Tip:${NC} To see curated servers by category, use:"
+    echo -e "${BLUE}To install:${NC}"
+    echo "  mcp-toggle install <package-name>"
+    echo ""
+    echo -e "${BLUE}Tip:${NC} For curated servers with impact ratings:"
     echo "  mcp-toggle discover database"
     echo "  mcp-toggle discover productivity"
+    echo ""
+}
+
+# Install MCP server package
+install_server() {
+    local package_name="$1"
+
+    if [ -z "$package_name" ]; then
+        echo -e "${RED}Error: Package name required${NC}"
+        echo "Usage: $0 install <package-name>"
+        echo ""
+        echo "Example:"
+        echo "  mcp-toggle install @playwright/mcp"
+        return 1
+    fi
+
+    echo -e "${BLUE}=== Installing MCP Server ===${NC}\n"
+    echo "Package: $package_name"
+    echo ""
+
+    # Check if ~/.mcp/servers exists
+    local servers_dir="$HOME/.mcp/servers"
+    if [ ! -d "$servers_dir" ]; then
+        echo -e "${YELLOW}Creating ~/.mcp/servers directory${NC}"
+        mkdir -p "$servers_dir"
+        cd "$servers_dir"
+        npm init -y >/dev/null 2>&1
+    fi
+
+    # Install package
+    echo -e "${BLUE}Installing package...${NC}"
+    cd "$servers_dir"
+
+    if npm install "$package_name" 2>&1 | grep -q "ERR!"; then
+        echo -e "${RED}Failed to install $package_name${NC}"
+        return 1
+    fi
+
+    echo -e "${GREEN}✓ Package installed${NC}"
+    echo ""
+
+    # Extract server name from package name
+    # Examples:
+    #   @playwright/mcp -> playwright
+    #   @modelcontextprotocol/server-github -> github
+    #   mcp-server-postgres -> postgres
+    #   brave-search-mcp -> brave-search
+    local server_name=$(echo "$package_name" | sed 's/@[^/]*\///' | sed 's/^mcp-server-//' | sed 's/^server-//' | sed 's/-mcp$//')
+
+    # Special case: if it's just "mcp" and the scope had a meaningful name, use the scope
+    if [ "$server_name" = "mcp" ]; then
+        local scope=$(echo "$package_name" | grep -o '^@[^/]*' | sed 's/@//')
+        if [ -n "$scope" ] && [ "$scope" != "modelcontextprotocol" ]; then
+            server_name="$scope"
+        fi
+    fi
+
+    # Try to detect the command
+    local package_json="$servers_dir/node_modules/$package_name/package.json"
+    local command="node"
+    local args=""
+
+    if [ -f "$package_json" ]; then
+        # Try to get bin field
+        local bin_name=$(jq -r '.bin // {} | keys[0] // empty' "$package_json" 2>/dev/null)
+
+        if [ -n "$bin_name" ]; then
+            # Use the bin entry
+            args="$servers_dir/node_modules/$package_name/$(jq -r ".bin[\"$bin_name\"] // .bin" "$package_json" 2>/dev/null)"
+        else
+            # Try main field
+            local main=$(jq -r '.main // "index.js"' "$package_json" 2>/dev/null)
+            args="$servers_dir/node_modules/$package_name/$main"
+        fi
+    else
+        # Fallback
+        args="$servers_dir/node_modules/$package_name/dist/index.js"
+    fi
+
+    echo -e "${BLUE}Detected configuration:${NC}"
+    echo "  Server name: $server_name"
+    echo "  Command: $command"
+    echo "  Args: $args"
+    echo ""
+
+    # Check if already in config
+    local global_config="$HOME/.mcp/global-config.json"
+    if [ ! -f "$global_config" ]; then
+        echo -e "${YELLOW}Creating global config${NC}"
+        echo '{"mcpServers": {}}' > "$global_config"
+    fi
+
+    if jq -e ".mcpServers.\"$server_name\"" "$global_config" &>/dev/null; then
+        echo -e "${YELLOW}⚠ Server $server_name already in config${NC}"
+        echo -e "${BLUE}To reconfigure, first remove it:${NC}"
+        echo "  mcp-toggle disable $server_name"
+        return 0
+    fi
+
+    # Add to config
+    backup_config
+
+    local temp_file=$(mktemp)
+    jq --arg name "$server_name" \
+       --arg cmd "$command" \
+       --arg args_val "$args" \
+       '.mcpServers[$name] = {
+           "command": $cmd,
+           "args": [$args_val]
+       }' "$global_config" > "$temp_file"
+    mv "$temp_file" "$global_config"
+
+    echo -e "${GREEN}✓ Added to global config${NC}"
+    echo ""
+
+    # Sync to editors
+    echo -e "${BLUE}Syncing to editors...${NC}"
+    if [ -x "$SCRIPT_DIR/bin/sync-all.sh" ]; then
+        "$SCRIPT_DIR/bin/sync-all.sh" 2>&1 | grep -E "(✓|Syncing)" || true
+    fi
+
+    echo ""
+    echo -e "${GREEN}✓ Installation complete!${NC}"
+    echo ""
+    echo -e "${BLUE}Next steps:${NC}"
+    echo "  1. If the server needs API keys, set them in ~/.zshrc:"
+    echo "     export SERVER_API_KEY='your-key'"
+    echo "  2. Restart your editor to load the new server"
+    echo "  3. Check server status:"
+    echo "     mcp-toggle info $server_name"
     echo ""
 }
 
@@ -870,8 +1022,9 @@ show_help() {
     echo "  mcp-toggle info [server-name]         Health check all servers OR specific server info"
     echo "  mcp-toggle list                       List all servers (enabled and disabled)"
     echo "  mcp-toggle stats                      Show usage statistics and recommendations"
-    echo "  mcp-toggle restart [server-name]      Show how to restart MCP servers"
     echo "  mcp-toggle discover [query]           Discover or search for MCP servers"
+    echo "  mcp-toggle install <package-name>     Install and configure an MCP server"
+    echo "  mcp-toggle restart [server-name]      Show how to restart MCP servers"
     echo "  mcp-toggle help                       Show this help message"
     echo ""
     echo -e "${GREEN}Examples:${NC}"
@@ -883,7 +1036,8 @@ show_help() {
     echo "  mcp-toggle stats                      Show statistics and recommendations"
     echo "  mcp-toggle discover                   Show all curated MCP servers"
     echo "  mcp-toggle discover database          Show database category servers"
-    echo "  mcp-toggle discover postgres          Search npm for 'postgres'"
+    echo "  mcp-toggle discover playwright        Search npm for 'playwright'"
+    echo "  mcp-toggle install @playwright/mcp    Install and configure Playwright server"
     echo "  mcp-toggle restart                    Show how to restart all MCP servers"
     echo ""
     echo -e "${YELLOW}Notes:${NC}"
@@ -930,11 +1084,14 @@ main() {
         stats)
             show_stats
             ;;
-        restart)
-            restart_mcp "$1"
-            ;;
         discover)
             discover_servers "$1"
+            ;;
+        install)
+            install_server "$1"
+            ;;
+        restart)
+            restart_mcp "$1"
             ;;
         help|--help|-h)
             show_help
@@ -946,6 +1103,7 @@ main() {
             echo "  • info       Show server info or list all servers"
             echo "  • stats      Show usage statistics"
             echo "  • discover   Browse or search for MCP servers"
+            echo "  • install    Install and configure a server"
             echo "  • enable     Enable a disabled server"
             echo "  • disable    Disable an enabled server"
             echo "  • help       Show full help"
