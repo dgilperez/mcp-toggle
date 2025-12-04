@@ -55,6 +55,16 @@ backup_config() {
     local backup_file="$BACKUP_DIR/claude-config-$timestamp.json"
     cp "$CLAUDE_CONFIG" "$backup_file"
     echo -e "${BLUE}Backup created: $backup_file${NC}"
+
+    # Rotate backups: keep only the 10 most recent
+    local backup_count=$(ls -1 "$BACKUP_DIR"/claude-config-*.json 2>/dev/null | wc -l | tr -d ' ')
+    if [ "$backup_count" -gt 10 ]; then
+        local to_delete=$((backup_count - 10))
+        # Delete oldest backups (sorted by filename which includes timestamp)
+        ls -1t "$BACKUP_DIR"/claude-config-*.json | tail -n "$to_delete" | while read -r old_backup; do
+            rm -f "$old_backup"
+        done
+    fi
 }
 
 # Clean up duplicate servers (prioritize enabled over disabled)
