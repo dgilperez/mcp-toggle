@@ -18,7 +18,9 @@ MCP_CACHE="$SCRIPT_DIR/data/mcp-cache.json"
 LOCAL_OVERRIDE="$HOME/.mcp/local-metadata.json"
 
 # Parse --config flag for testing
-CLAUDE_CONFIG="$HOME/.claude.json"
+# Use global config as source of truth, then sync to editor configs
+CLAUDE_CONFIG="$HOME/.mcp/global-config.json"
+EDITOR_CONFIG="$HOME/.claude.json"
 if [ "${1:-}" = "--config" ]; then
     CLAUDE_CONFIG="$2"
     shift 2
@@ -93,6 +95,22 @@ cleanup_duplicates() {
     jq "$jq_script" "$CLAUDE_CONFIG" > "$temp_file"
     mv "$temp_file" "$CLAUDE_CONFIG"
     echo -e "${GREEN}✓ Cleaned up duplicates${NC}"
+}
+
+# Sync global config to editor configs
+sync_to_editors() {
+    # Only sync if we have both configs
+    if [ ! -f "$CLAUDE_CONFIG" ] || [ ! -f "$EDITOR_CONFIG" ]; then
+        return 0
+    fi
+
+    # Copy global config to Claude Desktop
+    cp "$CLAUDE_CONFIG" "$EDITOR_CONFIG"
+
+    # Run sync-all.sh if available (syncs to other editors)
+    if [ -f "$SCRIPT_DIR/bin/sync-all.sh" ]; then
+        "$SCRIPT_DIR/bin/sync-all.sh" >/dev/null 2>&1
+    fi
 }
 
 # List all servers
@@ -453,6 +471,9 @@ enable_server() {
     for server_name in "${to_enable[@]}"; do
         echo -e "${GREEN}✓ Enabled $server_name${NC}"
     done
+
+    # Sync to editor configs
+    sync_to_editors
 }
 
 # Disable server(s) - supports bulk operations
@@ -505,6 +526,9 @@ disable_server() {
     for server_name in "${to_disable[@]}"; do
         echo -e "${YELLOW}✓ Disabled $server_name${NC}"
     done
+
+    # Sync to editor configs
+    sync_to_editors
 }
 
 # Restart MCP servers (restart Claude Code)
@@ -871,13 +895,12 @@ install_server() {
     echo ""
 
     # Check if already in config
-    local global_config="$HOME/.mcp/global-config.json"
-    if [ ! -f "$global_config" ]; then
+    if [ ! -f "$CLAUDE_CONFIG" ]; then
         echo -e "${YELLOW}Creating global config${NC}"
-        echo '{"mcpServers": {}}' > "$global_config"
+        echo '{"mcpServers": {}}' > "$CLAUDE_CONFIG"
     fi
 
-    if jq -e ".mcpServers.\"$server_name\"" "$global_config" &>/dev/null; then
+    if jq -e ".mcpServers.\"$server_name\"" "$CLAUDE_CONFIG" &>/dev/null; then
         echo -e "${YELLOW}⚠ Server $server_name already in config${NC}"
         echo -e "${BLUE}To reconfigure, first remove it:${NC}"
         echo "  mcp-toggle disable $server_name"
@@ -894,17 +917,14 @@ install_server() {
        '.mcpServers[$name] = {
            "command": $cmd,
            "args": [$args_val]
-       }' "$global_config" > "$temp_file"
-    mv "$temp_file" "$global_config"
+       }' "$CLAUDE_CONFIG" > "$temp_file"
+    mv "$temp_file" "$CLAUDE_CONFIG"
 
     echo -e "${GREEN}✓ Added to global config${NC}"
     echo ""
 
-    # Sync to editors
-    echo -e "${BLUE}Syncing to editors...${NC}"
-    if [ -x "$SCRIPT_DIR/bin/sync-all.sh" ]; then
-        "$SCRIPT_DIR/bin/sync-all.sh" 2>&1 | grep -E "(✓|Syncing)" || true
-    fi
+    # Sync to editor configs
+    sync_to_editors
 
     echo ""
     echo -e "${GREEN}✓ Installation complete!${NC}"
@@ -975,20 +995,11 @@ uninstall_server() {
     # Backup before changes
     backup_config
 
-    # Remove from Claude config
+    # Remove from global config (source of truth)
     local temp_file=$(mktemp)
     jq "del(.mcpServers.\"$server_name\") | del(._disabled_mcpServers.\"$server_name\")" "$CLAUDE_CONFIG" > "$temp_file"
     mv "$temp_file" "$CLAUDE_CONFIG"
-    echo -e "${GREEN}✓ Removed from Claude config${NC}"
-
-    # Also remove from global config (source of truth)
-    local global_config="$HOME/.mcp/global-config.json"
-    if [ -f "$global_config" ]; then
-        local temp_file=$(mktemp)
-        jq "del(.mcpServers.\"$server_name\") | del(._disabled_mcpServers.\"$server_name\")" "$global_config" > "$temp_file"
-        mv "$temp_file" "$global_config"
-        echo -e "${GREEN}✓ Removed from global config${NC}"
-    fi
+    echo -e "${GREEN}✓ Removed from config${NC}"
 
     # Try to find and remove npm package
     local servers_dir="$HOME/.mcp/servers"
@@ -1037,12 +1048,8 @@ uninstall_server() {
         fi
     fi
 
-    # Sync to editors
-    echo ""
-    echo -e "${BLUE}Syncing to editors...${NC}"
-    if [ -x "$SCRIPT_DIR/bin/sync-all.sh" ]; then
-        "$SCRIPT_DIR/bin/sync-all.sh" 2>&1 | grep -E "(✓|Syncing)" || true
-    fi
+    # Sync to editor configs
+    sync_to_editors
 
     echo ""
     echo -e "${GREEN}✓ Uninstallation complete!${NC}"
