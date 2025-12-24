@@ -738,35 +738,71 @@ show_curated_servers() {
 # Search npm for MCP packages
 search_npm() {
     local query="$1"
+    local query_lower=$(echo "$query" | tr '[:upper:]' '[:lower:]')
 
-    echo -e "${YELLOW}Searching npm for: $query${NC}\n"
+    echo -e "${YELLOW}Searching npm for MCP servers: $query${NC}\n"
 
     # Search npm with JSON output for better parsing
-    local results=$(npm search "mcp $query" --json 2>/dev/null)
+    # Use multiple search strategies to find actual MCP servers
+    local results=""
 
-    if [ -z "$results" ] || [ "$results" = "[]" ]; then
-        echo "  No packages found"
+    # Strategy 1: Search for "mcp-server-<query>" pattern (most specific)
+    local results1=$(npm search "mcp-server-$query" --json 2>/dev/null)
+
+    # Strategy 2: Search for "<query>-mcp" pattern
+    local results2=$(npm search "$query-mcp" --json 2>/dev/null)
+
+    # Strategy 3: Search for "@modelcontextprotocol" scoped packages with query
+    local results3=$(npm search "@modelcontextprotocol $query" --json 2>/dev/null)
+
+    # Strategy 4: Search for "mcp <query>" broadly
+    local results4=$(npm search "mcp $query" --json 2>/dev/null)
+
+    # Merge and filter results - only keep packages that:
+    # 1. Are MCP-related (by name or description)
+    # 2. Are relevant to the search query
+    results=$(echo "[$results1, $results2, $results3, $results4]" | jq -s --arg q "$query_lower" 'add | flatten | unique_by(.name) | [.[] | select(
+        # Must be MCP-related
+        (
+            (.name | test("mcp"; "i")) or
+            (.name | test("@modelcontextprotocol")) or
+            (.name | test("@anthropic")) or
+            ((.description // "") | test("mcp|model context protocol"; "i"))
+        )
+        and
+        # Must be relevant to query (name or description contains query)
+        (
+            (.name | ascii_downcase | test($q)) or
+            ((.description // "") | ascii_downcase | test($q))
+        )
+    )]' 2>/dev/null)
+
+    if [ -z "$results" ] || [ "$results" = "[]" ] || [ "$results" = "null" ]; then
+        echo "  No MCP servers found for '$query'"
+        echo ""
+        echo -e "${BLUE}Tips:${NC}"
+        echo "  • Try different keywords (e.g., 'postgres', 'github', 'slack')"
+        echo "  • Browse curated servers: mcp-toggle discover"
+        echo "  • Check the official registry: https://github.com/modelcontextprotocol/servers"
         echo ""
         return
     fi
 
     # Parse and display results with better formatting
     echo "$results" | jq -r '
-        # Sort by quality score (if available) and date
+        # Sort by date (most recent first)
         sort_by(.date) | reverse |
-        .[:10] |
+        .[:15] |
         .[] |
         # Format output
-        "  \(.name)\n    v\(.version) | Updated: \(.date[:10]) | \(.description[:80])"
+        "  \(.name)\n    v\(.version // "?") | \(.date[:10] // "unknown") | \(.description[:70] // "No description")..."
     ' 2>/dev/null || {
-        # Fallback to simple text search if jq parsing fails
-        npm search "mcp $query" 2>/dev/null | head -20 | grep -v "^NAME" | while IFS= read -r line; do
-            if [ -n "$line" ]; then
-                echo "  $line"
-            fi
-        done
+        echo "  Error parsing results"
     }
 
+    local count=$(echo "$results" | jq 'length' 2>/dev/null || echo "0")
+    echo ""
+    echo -e "${BLUE}Found $count MCP server(s)${NC}"
     echo ""
     echo -e "${BLUE}To install:${NC}"
     echo "  mcp-toggle install <package-name>"
